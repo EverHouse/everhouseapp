@@ -22,7 +22,6 @@ import { useNavigationLoading } from './stores/navigationLoadingStore';
 import WalkingGolferLoader from './components/WalkingGolferLoader';
 import { useNotificationSounds } from './hooks/useNotificationSounds';
 import { useNotificationStore } from './stores/notificationStore';
-import { useEdgeSwipe } from './hooks/useEdgeSwipe';
 import { useKeyboardDetection } from './hooks/useKeyboardDetection';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useSupabaseRealtime } from './hooks/useSupabaseRealtime';
@@ -612,30 +611,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   useDebugLayout();
   useKeyboardDetection();
 
-  // Route classification (used by edge swipe + layout)
+  // Route classification (used by layout)
   const isMemberRoute = ['/dashboard', '/book', '/events', '/wellness', '/profile', '/updates', '/history'].some(path => location.pathname.startsWith(path));
   const isAdminRoute = location.pathname.startsWith('/admin');
 
-  // Edge swipe to open hamburger menu on touch devices
-  const anyMenuOpen = isMenuOpen || isMemberMenuOpen || isStaffMenuOpen;
-  const { isActive: isEdgeSwipeActive, progress: edgeSwipeProgress } = useEdgeSwipe({
-    enabled: !anyMenuOpen,
-    edgeWidth: 50,
-    threshold: 100,
-    onSwipe: () => {
-      if (isAdminRoute) {
-        setIsStaffMenuOpen(true);
-      } else if (isMemberRoute) {
-        if (location.pathname === '/profile' && isStaffOrAdmin && !isViewingAs) {
-          setIsStaffMenuOpen(true);
-        } else {
-          setIsMemberMenuOpen(true);
-        }
-      } else {
-        setIsMenuOpen(true);
-      }
-    }
-  });
 
   useEffect(() => {
     // Track scroll position for landing page hero effects
@@ -857,24 +836,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         Skip to main content
       </a>
       
-      {/* Edge swipe indicator - "Menu" pill that slides in from left edge */}
-      <div 
-        className={`fixed left-0 top-1/2 -translate-y-1/2 pointer-events-none transition-all duration-fast ${isEdgeSwipeActive ? 'opacity-100' : 'opacity-0'}`}
-        style={{ 
-          zIndex: 'var(--z-header)',
-          transform: `translateY(-50%) translateX(${isEdgeSwipeActive ? Math.min(edgeSwipeProgress * 60, 50) : -40}px) scale(${0.8 + edgeSwipeProgress * 0.3})`,
-          transition: isEdgeSwipeActive ? 'none' : 'all 0.3s var(--spring-bounce)'
-        }}
-      >
-        <div 
-          className="px-3 py-2 rounded-full bg-accent/90 backdrop-blur-sm flex items-center gap-1.5 shadow-lg"
-          style={{ opacity: Math.min(edgeSwipeProgress * 1.5, 1) }}
-        >
-          <span className="material-symbols-outlined text-white text-base">menu</span>
-          <span className="text-white text-xs font-semibold tracking-wide">Menu</span>
-        </div>
-      </div>
-
       <div className="fixed inset-0 pointer-events-none z-0 opacity-[0.04] mix-blend-overlay" id="texture-bg"></div>
 
       <NotificationContext.Provider value={{ openNotifications }}>

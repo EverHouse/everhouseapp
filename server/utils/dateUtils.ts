@@ -1,34 +1,31 @@
-/**
- * Pacific Timezone Utilities for Backend
- * 
- * All club operations use America/Los_Angeles timezone for consistency.
- * Use these utilities for all date/time operations to ensure timezone correctness.
- */
+import { CLUB_TIMEZONE } from '../../shared/constants/timezone';
+export { CLUB_TIMEZONE };
 
-export const CLUB_TIMEZONE = 'America/Los_Angeles';
+export {
+  getTodayPacific,
+  addDaysToPacificDate,
+  parseLocalDate,
+  formatDateDisplay,
+  formatDateDisplayWithDay,
+  formatTime12Hour
+} from '../../shared/utils/dateUtils';
 
-/**
- * Get today's date in Pacific timezone as YYYY-MM-DD string
- */
-export function getTodayPacific(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: CLUB_TIMEZONE });
-}
+import {
+  getTodayPacific,
+  addDaysToPacificDate,
+  formatDateDisplayWithDay,
+  formatTime12Hour
+} from '../../shared/utils/dateUtils';
 
-/**
- * Get current hour (0-23) in Pacific timezone
- */
 export function getPacificHour(): number {
   const formatter = new Intl.DateTimeFormat('en-US', {
     timeZone: CLUB_TIMEZONE,
     hour: 'numeric',
-    hourCycle: 'h23' // Use 0-23 range (not hour12: false which can return 24)
+    hourCycle: 'h23'
   });
   return parseInt(formatter.format(new Date()), 10);
 }
 
-/**
- * Get Pacific date parts from current time
- */
 export function getPacificDateParts(): { year: number; month: number; day: number; hour: number; minute: number; dayOfWeek: number } {
   const now = new Date();
   const formatter = new Intl.DateTimeFormat('en-US', {
@@ -55,53 +52,18 @@ export function getPacificDateParts(): { year: number; month: number; day: numbe
   };
 }
 
-/**
- * Get current day of month (1-31) in Pacific timezone
- */
 export function getPacificDayOfMonth(): number {
   const parts = getPacificDateParts();
   return parts.day;
 }
 
-/**
- * Add days to a YYYY-MM-DD date string, returning a new YYYY-MM-DD string
- */
-export function addDaysToPacificDate(dateStr: string, days: number): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return date.toISOString().split('T')[0];
-}
-
-/**
- * Parse a YYYY-MM-DD string as a local date (avoids timezone shift issues)
- * The returned Date represents the date at midnight in local time
- */
-export function parseLocalDate(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-/**
- * Format a date to YYYY-MM-DD in Pacific timezone
- */
 export function formatDatePacific(date: Date): string {
   return date.toLocaleDateString('en-CA', { timeZone: CLUB_TIMEZONE });
 }
 
-/**
- * Get a Date object representing midnight Pacific time for a given date string (YYYY-MM-DD)
- * or for today if no date is provided. Returns the UTC timestamp that corresponds to
- * 00:00:00 Pacific time on that date.
- * 
- * Uses an iterative approach to correctly handle DST transitions:
- * 1. Make an initial guess using a default offset
- * 2. Check what offset actually applies at that instant
- * 3. If different, recalculate with the correct offset
- */
 export function getPacificMidnightUTC(dateStr?: string): Date {
   const targetDate = dateStr || getTodayPacific();
   
-  // Helper to get offset for a specific UTC instant
   const getOffsetAtInstant = (instant: Date): number => {
     const offsetStr = new Intl.DateTimeFormat('en-US', {
       timeZone: CLUB_TIMEZONE,
@@ -112,21 +74,17 @@ export function getPacificMidnightUTC(dateStr?: string): Date {
     return offsetMatch ? parseInt(offsetMatch[1], 10) : -8;
   };
   
-  // Helper to format offset as ISO string (e.g., -08:00)
   const formatOffset = (hours: number): string => {
     return hours < 0 
       ? `-${String(Math.abs(hours)).padStart(2, '0')}:00`
       : `+${String(hours).padStart(2, '0')}:00`;
   };
   
-  // First guess: use PST offset (-8)
   let guess = new Date(`${targetDate}T00:00:00-08:00`);
   const actualOffset = getOffsetAtInstant(guess);
   
-  // If the offset at our guess differs, recalculate
   if (actualOffset !== -8) {
     guess = new Date(`${targetDate}T00:00:00${formatOffset(actualOffset)}`);
-    // Double-check the offset (in case of edge cases)
     const finalOffset = getOffsetAtInstant(guess);
     if (finalOffset !== actualOffset) {
       guess = new Date(`${targetDate}T00:00:00${formatOffset(finalOffset)}`);
@@ -136,28 +94,16 @@ export function getPacificMidnightUTC(dateStr?: string): Date {
   return guess;
 }
 
-/**
- * Format a date to HH:MM:SS in Pacific timezone (24-hour format)
- */
 export function formatTimePacific(date: Date): string {
   return date.toLocaleTimeString('en-GB', { timeZone: CLUB_TIMEZONE, hour12: false });
 }
 
-/**
- * Get ISO string for a Pacific date and time
- * This creates a proper ISO timestamp from a date (YYYY-MM-DD) and time (HH:MM or HH:MM:SS)
- * interpreted as Pacific timezone. Handles DST correctly by computing offset for the target date.
- */
 export function getPacificISOString(dateStr: string, timeStr: string): string {
-  // Ensure time has seconds
   const normalizedTime = timeStr.length === 5 ? `${timeStr}:00` : timeStr;
   
-  // Create a reference date for the target date to get the correct DST offset
-  // Use noon to avoid edge cases around midnight DST transitions
   const [year, month, day] = dateStr.split('-').map(Number);
   const targetDate = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
   
-  // Get Pacific offset for the target date
   const pacificFormatter = new Intl.DateTimeFormat('en-US', {
     timeZone: CLUB_TIMEZONE,
     timeZoneName: 'shortOffset'
@@ -165,8 +111,7 @@ export function getPacificISOString(dateStr: string, timeStr: string): string {
   const parts = pacificFormatter.formatToParts(targetDate);
   const offsetPart = parts.find(p => p.type === 'timeZoneName')?.value || '-08:00';
   
-  // Parse offset like "GMT-8" or "GMT-7" to "-08:00" or "-07:00"
-  let offset = '-08:00'; // Default to PST
+  let offset = '-08:00';
   const offsetMatch = offsetPart.match(/GMT([+-])(\d+)/);
   if (offsetMatch) {
     const sign = offsetMatch[1];
@@ -177,74 +122,14 @@ export function getPacificISOString(dateStr: string, timeStr: string): string {
   return `${dateStr}T${normalizedTime}${offset}`;
 }
 
-/**
- * Create a Date object from Pacific date and time strings
- * Properly handles the Pacific timezone offset
- */
 export function createPacificDate(dateStr: string, timeStr: string): Date {
   return new Date(getPacificISOString(dateStr, timeStr));
 }
 
-/**
- * Format a YYYY-MM-DD date string for display (e.g., "Jan 15")
- * This parses the string directly and formats without timezone issues
- */
-export function formatDateDisplay(dateStr: string): string {
-  const [_year, month, day] = dateStr.split('-').map(Number);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${months[month - 1]} ${day}`;
-}
-
-/**
- * Get day of week (0-6) for a YYYY-MM-DD date using Zeller's algorithm (timezone-agnostic)
- */
-function getDayOfWeek(year: number, month: number, day: number): number {
-  // Adjust for Zeller's algorithm (January = 13, February = 14 of previous year)
-  if (month < 3) {
-    month += 12;
-    year -= 1;
-  }
-  const k = year % 100;
-  const j = Math.floor(year / 100);
-  const h = (day + Math.floor(13 * (month + 1) / 5) + k + Math.floor(k / 4) + Math.floor(j / 4) - 2 * j) % 7;
-  // Convert from Zeller (0=Saturday) to JS convention (0=Sunday)
-  return ((h + 6) % 7);
-}
-
-/**
- * Format a YYYY-MM-DD date string for display with weekday (e.g., "Wed, Jan 15")
- * Uses pure calculation, no timezone dependencies
- */
-export function formatDateDisplayWithDay(dateStr: string): string {
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const dayOfWeek = getDayOfWeek(year, month, day);
-  return `${days[dayOfWeek]}, ${months[month - 1]} ${day}`;
-}
-
-/**
- * Get tomorrow's date in Pacific timezone as YYYY-MM-DD string
- */
 export function getTomorrowPacific(): string {
   return addDaysToPacificDate(getTodayPacific(), 1);
 }
 
-/**
- * Format a time string (HH:MM or HH:MM:SS) to 12-hour format (e.g., "1:00 PM")
- */
-export function formatTime12Hour(timeStr: string): string {
-  if (!timeStr || !timeStr.includes(':')) return timeStr || '';
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${(minutes ?? 0).toString().padStart(2, '0')} ${ampm}`;
-}
-
-/**
- * Format a date and time for user-friendly notification display
- * e.g., "Tue, Dec 30 at 1:00 PM"
- */
 export function formatNotificationDateTime(dateStr: string, timeStr: string): string {
   return `${formatDateDisplayWithDay(dateStr)} at ${formatTime12Hour(timeStr)}`;
 }

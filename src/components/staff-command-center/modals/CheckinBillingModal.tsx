@@ -117,11 +117,7 @@ export const CheckinBillingModal: React.FC<CheckinBillingModalProps> = ({
   }, [bookingId]);
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('[CheckinBillingModal] Props changed:', { isOpen, bookingId });
     if (isOpen && bookingId) {
-      // eslint-disable-next-line no-console
-      console.log('[CheckinBillingModal] Opening and fetching context');
       fetchContext();
     }
   }, [isOpen, bookingId, fetchContext]);

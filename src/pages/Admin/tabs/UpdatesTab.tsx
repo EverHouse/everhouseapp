@@ -58,7 +58,6 @@ const UpdatesTab: React.FC = () => {
 
     useEffect(() => {
         const handleBookingUpdate = () => {
-            console.log('[UpdatesTab] Global booking-update event received');
             refetchNotifications();
         };
         window.addEventListener('booking-update', handleBookingUpdate);

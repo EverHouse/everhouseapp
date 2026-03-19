@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuthData, useBookingData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { usePageReady } from '../../../stores/pageReadyStore';
 import { useToast } from '../../../components/Toast';
@@ -27,14 +27,13 @@ import {
   bookGolfKeys,
   generateDates,
   doesClosureAffectResource,
-} from '../bookGolf/bookGolfTypes';
+} from './bookGolfTypes';
 import type { GuardianConsentData } from '../../../components/booking';
 
 export function useBookGolf() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user, viewAsUser, actualUser, isViewingAs } = useAuthData();
-  const { addBooking } = useBookingData();
   const { effectiveTheme } = useTheme();
   const { setPageReady } = usePageReady();
   const { showToast } = useToast();
@@ -531,7 +530,6 @@ export function useBookGolf() {
         member_notes: memberNotes.trim() || undefined, request_participants: requestParticipants,
         ...(consent ? { guardian_name: consent.guardianName, guardian_relationship: consent.guardianRelationship, guardian_phone: consent.guardianPhone, guardian_consent: consent.acknowledged } : {})
       });
-      addBooking({ id: Date.now().toString(), type: 'golf', title: selectedResource.name, date: selectedDateObj.label, time: selectedSlot.start, details: `${duration} min`, color: 'primary' });
       bookingEvents.emit(); haptic.success(); playSound('bookingConfirmed');
       if (activeTab === 'conference' && bookingResult.invoicePayment) {
         showToast(bookingResult.invoicePayment.paidInFull ? 'Conference room booked and paid!' : 'Conference room booked! Overage fee will be collected at check-in.', 'success', 4000);

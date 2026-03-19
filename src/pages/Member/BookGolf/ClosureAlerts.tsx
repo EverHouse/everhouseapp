@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatTime12Hour } from '../../../utils/dateUtils';
-import type { Closure } from '../bookGolf/bookGolfTypes';
+import type { Closure } from './bookGolfTypes';
 
 interface ClosureAlertsProps {
   closures: Closure[];

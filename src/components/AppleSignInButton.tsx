@@ -60,7 +60,7 @@ const AppleSignInButton: React.FC<AppleSignInButtonProps> = ({
 }) => {
   useEffect(() => {
     if (!APPLE_CLIENT_ID) return;
-    ensureAppleSDK().catch(() => {});
+    ensureAppleSDK().catch(err => console.warn('[AppleSignIn] Failed to preload Apple SDK:', err));
   }, []);
 
   const handleClick = useCallback(async () => {

@@ -119,7 +119,8 @@ self.addEventListener('fetch', function(event) {
               cache.put(request, networkResponse.clone());
             }
             return networkResponse;
-          }).catch(function() {
+          }).catch(function(err) {
+            console.warn('[SW] Font fetch failed:', err.message || err);
             return cachedResponse || new Response('', { status: 503 });
           });
           return cachedResponse || networkFetch;

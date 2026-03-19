@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials, putWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { apiRequestBlob } from '../../../lib/apiRequest';
-import { useAuthData, useBookingData } from '../../../contexts/DataContext';
+import { useAuthData } from '../../../contexts/DataContext';
 import { useTheme } from '../../../contexts/ThemeContext';
 import { usePageReady } from '../../../stores/pageReadyStore';
 import { useNavigationLoading } from '../../../stores/navigationLoadingStore';
@@ -23,7 +23,6 @@ export function useDashboardData() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { user, actualUser, viewAsUser, isViewingAs } = useAuthData();
-  const { addBooking: _addBooking, deleteBooking } = useBookingData();
   const { effectiveTheme } = useTheme();
 
   const isAdminViewingAs = actualUser?.role === 'admin' && isViewingAs;
@@ -217,7 +216,7 @@ export function useDashboardData() {
 
         localStorage.setItem(localKey, 'true');
 
-        postWithCredentials('/api/member/onboarding/complete-step', { step: 'first_login' }).catch(() => {});
+        postWithCredentials('/api/member/onboarding/complete-step', { step: 'first_login' }).catch(err => console.error('[Dashboard] Failed to complete onboarding step:', err));
 
         queueMicrotask(() => setShowFirstLoginModal(true));
       } catch {
@@ -481,7 +480,6 @@ export function useDashboardData() {
         });
         showToast('Cancellation request submitted. You\'ll be notified when it\'s complete.', 'success');
       } else {
-        deleteBooking(String(bookingId));
         showToast('Booking cancelled successfully', 'success');
       }
       refetchAllData();

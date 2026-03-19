@@ -7,15 +7,12 @@ import { BookingStatusDropdown } from '../../BookingStatusDropdown';
 import { postWithCredentials, patchWithCredentials } from '../../../hooks/queries/useFetch';
 
 interface PaymentSummaryBodyProps {
-  isConferenceRoom: boolean;
   rosterData: ManageModeRosterData | null;
   renderTierBadge: (tier: string | null | undefined, membershipStatus?: string | null) => React.ReactNode;
   paymentSuccess: boolean;
 }
 
 export function PaymentSummaryBody({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isConferenceRoom,
   rosterData,
   renderTierBadge,
   paymentSuccess,
@@ -93,94 +90,34 @@ export function PaymentSummaryBody({
 }
 
 interface PaymentActionFooterProps {
-  isConferenceRoom: boolean;
   bookingId?: number;
   rosterData: ManageModeRosterData | null;
-  fetchedContext: FetchedContext | null;
-  ownerName?: string;
-  ownerEmail?: string;
-  bayName?: string;
-  bookingDate?: string;
   showInlinePayment: boolean;
   setShowInlinePayment: (show: boolean) => void;
-  inlinePaymentAction: string | null;
   setInlinePaymentAction: (action: string | null) => void;
-  paymentSuccess: boolean;
   processingPayment?: boolean;
-  savedCardInfo: { hasSavedCard: boolean; cardLast4?: string; cardBrand?: string } | null;
-  checkingCard: boolean;
-  showWaiverInput: boolean;
   setShowWaiverInput: (show: boolean) => void;
-  waiverReason: string;
   setWaiverReason: (reason: string) => void;
-  handleInlineStripeSuccess: () => void;
-  handleChargeCardOnFile: () => void;
-  handleWaiveFees: () => void;
-  renderTierBadge: (tier: string | null | undefined, membershipStatus?: string | null) => React.ReactNode;
   onClose: () => void;
-  checkinMode?: boolean;
-  savingChanges: boolean;
-  handleManageModeSave: () => void;
   onCheckIn?: (bookingId: number, targetStatus?: 'attended' | 'no_show') => void | Promise<void>;
   onRevertToApproved?: (bookingId: number) => void | Promise<void>;
-  onReschedule?: (booking: { id: number; requestDate: string; startTime: string; endTime: string; resourceId: number; resourceName?: string; userName?: string; userEmail?: string }) => void;
   onCancelBooking?: (bookingId: number) => void;
-  bookingContext?: { requestDate?: string; startTime?: string; endTime?: string; resourceId?: number; resourceName?: string };
   bookingStatus?: string;
 }
 
 export function PaymentActionFooter({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  isConferenceRoom,
   bookingId,
   rosterData,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  fetchedContext,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ownerName,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  ownerEmail,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  bayName,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  bookingDate,
   showInlinePayment,
   setShowInlinePayment,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  inlinePaymentAction,
   setInlinePaymentAction,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  paymentSuccess,
   processingPayment,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  savedCardInfo,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  checkingCard,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  showWaiverInput,
   setShowWaiverInput,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  waiverReason,
   setWaiverReason,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleInlineStripeSuccess,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleChargeCardOnFile,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleWaiveFees,
   onClose,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  checkinMode,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  savingChanges,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  handleManageModeSave,
   onCheckIn,
   onRevertToApproved,
-  onReschedule: _onReschedule,
   onCancelBooking,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  bookingContext,
   bookingStatus,
 }: PaymentActionFooterProps) {
   const [checkingIn, setCheckingIn] = React.useState(false);
@@ -363,7 +300,7 @@ export function InlinePaymentBody({
             setMemberBalance(null);
           }
         })
-        .catch(() => setMemberBalance(null));
+        .catch((err) => { console.error('[PaymentSection] Failed to fetch member balance:', err); setMemberBalance(null); });
     });
   }, [showInlinePayment, bookingId]);
 
@@ -710,7 +647,6 @@ export function InlinePaymentBody({
 }
 
 interface PaymentSectionProps {
-  isConferenceRoom: boolean;
   bookingId?: number;
   rosterData: ManageModeRosterData | null;
   fetchedContext: FetchedContext | null;
@@ -758,7 +694,6 @@ export function PaymentSection(props: PaymentSectionProps) {
   return (
     <>
       <PaymentSummaryBody
-        isConferenceRoom={props.isConferenceRoom}
         rosterData={props.rosterData}
         renderTierBadge={props.renderTierBadge}
         paymentSuccess={props.paymentSuccess}

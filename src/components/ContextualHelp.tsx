@@ -40,7 +40,7 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
           .sort((a, b) => a.sortOrder - b.sortOrder);
         setSections(filtered);
       })
-      .catch(() => { if (!cancelled) setSections([]); })
+      .catch((err) => { console.error('[ContextualHelp] Failed to load help sections:', err); if (!cancelled) setSections([]); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [isOpen, guideIds]);

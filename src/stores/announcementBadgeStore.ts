@@ -69,7 +69,7 @@ export const useAnnouncementBadgeStore = create<AnnouncementBadgeState>((set, ge
       return { seenIds: newSet };
     });
     announcementIds.forEach(id => {
-      postWithCredentials('/api/notices/dismiss', { noticeType: 'announcement', noticeId: id }).catch(() => {});
+      postWithCredentials('/api/notices/dismiss', { noticeType: 'announcement', noticeId: id }).catch(err => console.error('[AnnouncementBadge] Failed to dismiss notice:', err));
     });
   },
 

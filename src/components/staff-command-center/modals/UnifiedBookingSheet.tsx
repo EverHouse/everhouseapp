@@ -63,39 +63,18 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
 
     const manageModeFooter = (
       <PaymentActionFooter
-        isConferenceRoom={logic.isConferenceRoom}
         bookingId={bookingId}
         rosterData={logic.rosterData}
-        fetchedContext={logic.fetchedContext}
-        ownerName={logic.fetchedContext?.ownerName || ownerName}
-        ownerEmail={logic.fetchedContext?.ownerEmail || ownerEmail}
-        bayName={bayName}
-        bookingDate={bookingDate}
         showInlinePayment={logic.showInlinePayment}
         setShowInlinePayment={logic.setShowInlinePayment}
-        inlinePaymentAction={logic.inlinePaymentAction}
         setInlinePaymentAction={logic.setInlinePaymentAction}
-        paymentSuccess={logic.paymentSuccess}
         processingPayment={logic.processingPayment}
-        savedCardInfo={logic.savedCardInfo}
-        checkingCard={logic.checkingCard}
-        showWaiverInput={logic.showWaiverInput}
         setShowWaiverInput={logic.setShowWaiverInput}
-        waiverReason={logic.waiverReason}
         setWaiverReason={logic.setWaiverReason}
-        handleInlineStripeSuccess={logic.handleInlineStripeSuccess}
-        handleChargeCardOnFile={logic.handleInlineChargeSavedCard}
-        handleWaiveFees={logic.handleInlineWaiveAll}
-        renderTierBadge={logic.renderTierBadge}
         onClose={handleManagedClose}
-        checkinMode={checkinMode}
-        savingChanges={logic.savingChanges}
-        handleManageModeSave={logic.handleManageModeSave}
         onCheckIn={onCheckIn}
         onRevertToApproved={onRevertToApproved}
-        onReschedule={onReschedule}
         onCancelBooking={onCancelBooking}
-        bookingContext={bookingContext}
         bookingStatus={bookingStatus}
       />
     );
@@ -221,7 +200,6 @@ export function UnifiedBookingSheet(props: UnifiedBookingSheetProps) {
 
               <ErrorBoundary fallback={<div className="p-3 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-900/10 text-sm text-red-600 dark:text-red-400">Payment section encountered an error. Please close and reopen this booking.</div>}>
                 <PaymentSummaryBody
-                  isConferenceRoom={logic.isConferenceRoom}
                   rosterData={logic.rosterData}
                   renderTierBadge={logic.renderTierBadge}
                   paymentSuccess={logic.paymentSuccess}

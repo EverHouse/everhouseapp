@@ -372,8 +372,6 @@ const SimulatorTab: React.FC = () => {
 
     useEffect(() => {
         const handleBookingUpdate = () => {
-            // eslint-disable-next-line no-console
-            console.log('[SimulatorTab] Global booking-update event received');
             handleRefresh();
         };
         window.addEventListener('booking-update', handleBookingUpdate);
@@ -456,8 +454,6 @@ const SimulatorTab: React.FC = () => {
         }
 
         if (newStatus === BOOKING_STATUS.ATTENDED && checkinInProgressRef.current.has(bookingId)) {
-            // eslint-disable-next-line no-console
-            console.log('[Check-in v2] Already in progress for booking', bookingId);
             return false;
         }
         if (newStatus === BOOKING_STATUS.ATTENDED) {

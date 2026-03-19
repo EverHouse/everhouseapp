@@ -13,7 +13,6 @@ import { BOOKING_STATUS, RESOURCE_TYPE } from '../../../../shared/constants/stat
 interface PendingRequestsCardProps {
   pendingRequests: BookingRequest[];
   today: string;
-  variant: 'desktop' | 'desktop-top' | 'desktop-bottom' | 'mobile';
   navigateToTab: (tab: TabType) => void;
   isActionLoading: (actionKey: string) => boolean;
   onOpenTrackman: (booking?: BookingRequest) => void;
@@ -24,8 +23,6 @@ interface PendingRequestsCardProps {
 const PendingRequestsCard = memo<PendingRequestsCardProps>(({
   pendingRequests,
   today,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  variant,
   navigateToTab,
   isActionLoading,
   onOpenTrackman,
@@ -205,7 +202,6 @@ interface UpcomingBookingsCardProps {
   mergedUpcomingBookings: BookingRequest[];
   today: string;
   navigateToTab: (tab: TabType) => void;
-  getStatusBadge: (booking: BookingRequest) => React.ReactNode;
   getSmartActionButton: (booking: BookingRequest) => React.ReactNode;
   onEditBooking?: (booking: BookingRequest) => void;
 }
@@ -214,8 +210,6 @@ const UpcomingBookingsCard = memo<UpcomingBookingsCardProps>(({
   mergedUpcomingBookings,
   today,
   navigateToTab,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  getStatusBadge,
   getSmartActionButton,
   onEditBooking
 }) => {
@@ -337,7 +331,6 @@ interface BookingQueuesSectionProps {
   today: string;
   actionInProgress: string | null;
   onOpenTrackman: (booking?: BookingRequest) => void;
-  onApprove: (request: BookingRequest) => void;
   onDeny: (request: BookingRequest) => void;
   onCheckIn: (booking: BookingRequest, targetStatus?: 'attended' | 'no_show' | 'approved') => void;
   onPaymentClick?: (bookingId: number) => void;
@@ -356,7 +349,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
   today,
   actionInProgress,
   onOpenTrackman,
-  onApprove,
   onDeny,
   onCheckIn,
   onPaymentClick,
@@ -372,18 +364,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
     if ((tabToPath as Record<string, string>)[tab]) navigate((tabToPath as Record<string, string>)[tab]);
   }, [navigate]);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { execute: executeApprove } = useAsyncAction(
-    async (request: BookingRequest) => {
-      setLoadingAction(`approve-${request.id}`);
-      try {
-        await onApprove(request);
-      } finally {
-        setLoadingAction(null);
-      }
-    }
-  );
 
   const { execute: executeDeny } = useAsyncAction(
     async (request: BookingRequest) => {
@@ -612,7 +592,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       <PendingRequestsCard
         pendingRequests={pendingRequests}
         today={today}
-        variant={variant}
         navigateToTab={navigateToTab}
         isActionLoading={isActionLoading}
         onOpenTrackman={onOpenTrackman}
@@ -628,7 +607,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         mergedUpcomingBookings={mergedUpcomingBookings}
         today={today}
         navigateToTab={navigateToTab}
-        getStatusBadge={getStatusBadge}
         getSmartActionButton={getSmartActionButton}
         onEditBooking={onEditBooking}
       />
@@ -641,7 +619,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         <PendingRequestsCard
           pendingRequests={pendingRequests}
           today={today}
-          variant={variant}
           navigateToTab={navigateToTab}
           isActionLoading={isActionLoading}
           onOpenTrackman={onOpenTrackman}
@@ -652,7 +629,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
           mergedUpcomingBookings={mergedUpcomingBookings}
           today={today}
           navigateToTab={navigateToTab}
-          getStatusBadge={getStatusBadge}
           getSmartActionButton={getSmartActionButton}
           onEditBooking={onEditBooking}
         />
@@ -665,7 +641,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
       <PendingRequestsCard
         pendingRequests={pendingRequests}
         today={today}
-        variant={variant}
         navigateToTab={navigateToTab}
         isActionLoading={isActionLoading}
         onOpenTrackman={onOpenTrackman}
@@ -676,7 +651,6 @@ export const BookingQueuesSection: React.FC<BookingQueuesSectionProps> = ({
         mergedUpcomingBookings={mergedUpcomingBookings}
         today={today}
         navigateToTab={navigateToTab}
-        getStatusBadge={getStatusBadge}
         getSmartActionButton={getSmartActionButton}
         onEditBooking={onEditBooking}
       />

@@ -115,8 +115,6 @@ const AdminDashboard: React.FC = () => {
   }, [adminQueryClient]);
 
   const handleGlobalBookingEvent = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.log('[AdminDashboard] Received global booking event, refreshing counts');
     refetchPendingCounts();
   }, [refetchPendingCounts]);
 

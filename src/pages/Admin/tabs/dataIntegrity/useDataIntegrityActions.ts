@@ -236,9 +236,6 @@ export function useDataIntegrityActions(state: DataIntegrityState) {
   useEffect(() => {
     const handleDataIntegrityUpdate = (event: CustomEvent) => {
       const { action } = event.detail || {};
-      // eslint-disable-next-line no-console
-      console.log('[DataIntegrity] Real-time update received:', action);
-      
       if (action === 'data_changed' || action === 'issue_resolved') {
         queryClient.invalidateQueries({ queryKey: ['data-integrity', 'cached'] });
         queryClient.invalidateQueries({ queryKey: ['data-integrity', 'history'] });

@@ -104,15 +104,10 @@ export function useSupabaseRealtime(options: UseSupabaseRealtimeOptions = {}) {
     channel.subscribe((status, err) => {
       if (!mountedRef.current) return;
 
-      if (status === 'SUBSCRIBED') {
-        // eslint-disable-next-line no-console
-        console.log(`[Supabase Realtime] Subscribed to ${table}`);
-      } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
         const errMsg = err ? ` (${err.message || err})` : '';
         console.warn(`[Supabase Realtime] ${status} for ${table}${errMsg} — SDK will auto-recover`);
       } else if (status === 'CLOSED') {
-        // eslint-disable-next-line no-console
-        console.log(`[Supabase Realtime] Channel closed for ${table}`);
         channelsRef.current.delete(table);
       }
     });

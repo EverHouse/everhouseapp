@@ -1,7 +1,7 @@
 import React from 'react';
 import { haptic } from '../../../utils/haptics';
 import { EmptySlots } from '../../../components/EmptyState';
-import type { TimeSlot } from '../bookGolf/bookGolfTypes';
+import type { TimeSlot } from './bookGolfTypes';
 
 interface HourGroup {
   hourLabel: string;

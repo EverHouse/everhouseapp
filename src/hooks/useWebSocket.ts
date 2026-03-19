@@ -28,7 +28,7 @@ interface UseWebSocketOptions {
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const { user, fetchNotifications } = useUserStore();
+  const { user } = useUserStore();
   const { effectiveEmail } = options;
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,12 +53,12 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           useNotificationStore.getState().setUnreadCount(data.length);
         }
       } else {
-        fetchNotifications();
+        await useNotificationStore.getState().fetchUnreadCount(emailToUse);
       }
     } catch (err: unknown) {
       console.warn('[WebSocket] Failed to fetch notifications:', err);
     }
-  }, [emailToUse, isViewAsMode, fetchNotifications]);
+  }, [emailToUse, isViewAsMode]);
 
   const connect = useCallback(() => {
     if (!emailToUse || isConnectingRef.current || wsRef.current?.readyState === WebSocket.OPEN) {

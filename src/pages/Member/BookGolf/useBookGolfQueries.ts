@@ -13,7 +13,7 @@ import {
   type FeeEstimateResponse,
   type PlayerSlot,
   bookGolfKeys,
-} from '../bookGolf/bookGolfTypes';
+} from './bookGolfTypes';
 
 export function useBookGolfQueries(
   activeTab: 'simulator' | 'conference',

@@ -106,7 +106,7 @@ export async function logWebhookEvent(
           existingPayload = typeof recentDupe.rows[0].payload === 'string' 
             ? JSON.parse(recentDupe.rows[0].payload) 
             : recentDupe.rows[0].payload;
-        } catch { existingPayload = {}; }
+        } catch (err) { console.warn('[Trackman] Failed to parse duplicate payload:', err); existingPayload = {}; }
         const existingBookingData = (existingPayload?.data || existingPayload?.booking || {}) as Record<string, unknown>;
         const existingStart = existingBookingData?.start || existingBookingData?.start_time || existingPayload?.start_time || '';
         const existingEnd = existingBookingData?.end || existingBookingData?.end_time || existingPayload?.end_time || '';

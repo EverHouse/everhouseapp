@@ -8,11 +8,10 @@ import type { DBBooking, ConfirmModalState } from './dashboardTypes';
 interface UseDashboardActionsParams {
   user: { email: string; name?: string } | null;
   isAdminViewingAs: boolean;
-  deleteBooking: (id: string) => void;
   refetchAllData: () => void;
 }
 
-export function useDashboardActions({ user, isAdminViewingAs, deleteBooking, refetchAllData }: UseDashboardActionsParams) {
+export function useDashboardActions({ user, isAdminViewingAs, refetchAllData }: UseDashboardActionsParams) {
   const { showToast } = useToast();
 
   const [_selectedBooking, setSelectedBooking] = useState<DBBooking | null>(null);
@@ -41,7 +40,6 @@ export function useDashboardActions({ user, isAdminViewingAs, deleteBooking, ref
         });
         showToast('Cancellation request submitted. You\'ll be notified when it\'s complete.', 'success');
       } else {
-        deleteBooking(String(bookingId));
         showToast('Booking cancelled successfully', 'success');
       }
       refetchAllData();

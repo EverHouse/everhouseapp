@@ -1,4 +1,4 @@
-import type { CafeItem, EventData, Announcement, Booking } from '../types/data';
+import type { CafeItem, EventData, Announcement } from '../types/data';
 
 export const INITIAL_CAFE: CafeItem[] = [
   // COFFEE
@@ -110,9 +110,3 @@ export const INITIAL_EVENTS: EventData[] = [
 ];
 
 export const INITIAL_ANNOUNCEMENTS: Announcement[] = [];
-
-
-export const INITIAL_BOOKINGS: Booking[] = [
-  { id: 'b1', type: 'dining', title: 'Lunch at The Patio', date: 'Tue, Oct 24', time: '12:30 PM', details: '4 Guests', color: 'accent' },
-  { id: 'b2', type: 'golf', title: 'Golf Simulator Bay 2', date: 'Wed, Oct 25', time: '09:00 AM', details: '60 min', color: 'primary' }
-];

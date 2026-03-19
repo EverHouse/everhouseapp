@@ -376,38 +376,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
     refresh();
   };
 
-  const handleApprove = async (request: BookingRequest) => {
-    const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', ''), 10) : request.id;
-    setActionInProgress(`approve-${request.id}`);
-    
-    const previousPendingRequests = [...data.pendingRequests];
-    
-    updatePendingRequests(prev => prev.filter(r => r.id !== request.id));
-    
-    const newActivity: RecentActivity = {
-      id: `approve-${apiId}-${Date.now()}`,
-      type: 'booking_approved',
-      timestamp: new Date().toISOString(),
-      primary_text: request.user_name || 'Member',
-      secondary_text: request.bay_name || 'Bay',
-      icon: 'check_circle'
-    };
-    updateRecentActivity(prev => [newActivity, ...prev]);
-    
-    try {
-      await putWithCredentials(`/api/booking-requests/${apiId}`, { status: BOOKING_STATUS.APPROVED });
-      showToast('Booking approved', 'success');
-      window.dispatchEvent(new CustomEvent('booking-action-completed'));
-      refresh();
-    } catch (_err: unknown) {
-      updatePendingRequests(() => previousPendingRequests);
-      updateRecentActivity(prev => prev.filter(a => a.id !== newActivity.id));
-      showToast('Failed to approve booking', 'error');
-    } finally {
-      setActionInProgress(null);
-    }
-  };
-
   const handleDeny = async (request: BookingRequest) => {
     const apiId = typeof request.id === 'string' ? parseInt(String(request.id).replace('cal_', ''), 10) : request.id;
     setActionInProgress(`deny-${request.id}`);
@@ -598,12 +566,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           {/* Top row: Next Tour, Next Event, Facility Status */}
           <div className="grid grid-cols-3 gap-6">
             <TodayScheduleSection
-              upcomingTours={data.upcomingTours}
               upcomingEvents={data.upcomingEvents}
               upcomingWellness={data.upcomingWellness}
               nextTour={data.nextTour}
               nextEvent={data.nextEvent}
-              nextScheduleItem={data.nextScheduleItem}
               nextActivityItem={data.nextActivityItem}
               today={today}
               variant="desktop-top"
@@ -628,7 +594,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
               today={today}
               actionInProgress={actionInProgress}
               onOpenTrackman={handleOpenTrackman}
-              onApprove={handleApprove}
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onCompleteCancellation={handleCompleteCancellation}
@@ -655,7 +620,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
               today={today}
               actionInProgress={actionInProgress}
               onOpenTrackman={handleOpenTrackman}
-              onApprove={handleApprove}
               onDeny={handleDeny}
               onCheckIn={handleCheckIn}
               onCompleteCancellation={handleCompleteCancellation}
@@ -685,23 +649,19 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           {/* Row 3: Upcoming Wellness, Upcoming Events, Alerts */}
           <div className="grid grid-cols-3 gap-6">
             <TodayScheduleSection
-              upcomingTours={data.upcomingTours}
               upcomingEvents={data.upcomingEvents}
               upcomingWellness={data.upcomingWellness}
               nextTour={data.nextTour}
               nextEvent={data.nextEvent}
-              nextScheduleItem={data.nextScheduleItem}
               nextActivityItem={data.nextActivityItem}
               today={today}
               variant="desktop-wellness"
             />
             <TodayScheduleSection
-              upcomingTours={data.upcomingTours}
               upcomingEvents={data.upcomingEvents}
               upcomingWellness={data.upcomingWellness}
               nextTour={data.nextTour}
               nextEvent={data.nextEvent}
-              nextScheduleItem={data.nextScheduleItem}
               nextActivityItem={data.nextActivityItem}
               today={today}
               variant="desktop-events"
@@ -721,12 +681,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
         <div className="lg:hidden space-y-4 animate-content-enter-delay-2">
           {/* Next Tour/Event cards */}
           <TodayScheduleSection
-            upcomingTours={data.upcomingTours}
             upcomingEvents={data.upcomingEvents}
             upcomingWellness={data.upcomingWellness}
             nextTour={data.nextTour}
             nextEvent={data.nextEvent}
-            nextScheduleItem={data.nextScheduleItem}
             nextActivityItem={data.nextActivityItem}
             today={today}
             variant="mobile-top"
@@ -765,7 +723,6 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
             today={today}
             actionInProgress={actionInProgress}
             onOpenTrackman={handleOpenTrackman}
-            onApprove={handleApprove}
             onDeny={handleDeny}
             onCheckIn={handleCheckIn}
             onCompleteCancellation={handleCompleteCancellation}
@@ -787,12 +744,10 @@ const StaffCommandCenter: React.FC<StaffCommandCenterProps> = ({ onTabChange: on
           />
           {/* Upcoming Events & Wellness */}
           <TodayScheduleSection
-            upcomingTours={data.upcomingTours}
             upcomingEvents={data.upcomingEvents}
             upcomingWellness={data.upcomingWellness}
             nextTour={data.nextTour}
             nextEvent={data.nextEvent}
-            nextScheduleItem={data.nextScheduleItem}
             nextActivityItem={data.nextActivityItem}
             today={today}
             variant="mobile-cards"

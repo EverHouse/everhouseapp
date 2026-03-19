@@ -363,8 +363,6 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
       const detail = (event as CustomEvent).detail;
       if (!detail) return;
       if (detail.bookingId && Number(detail.bookingId) === bookingId) {
-        // eslint-disable-next-line no-console
-        console.log('[BookingSheet] Billing update received for this booking, refreshing');
         onPaymentConfirmed();
       }
     };
@@ -389,16 +387,12 @@ export function useUnifiedBookingLogic(props: UnifiedBookingSheetProps) {
     const handleRosterUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
-      // eslint-disable-next-line no-console
-      console.log('[BookingSheet] Roster update received via WebSocket, refreshing', detail.action);
       debouncedRefresh();
     };
 
     const handleInvoiceUpdate = (event: Event) => {
       const detail = (event as CustomEvent).detail;
       if (!detail || Number(detail.bookingId) !== bookingId) return;
-      // eslint-disable-next-line no-console
-      console.log('[BookingSheet] Invoice update received via WebSocket, refreshing', detail.action);
       debouncedRefresh();
       if (detail.action === 'invoice_paid' || detail.action === 'payment_confirmed') {
         setPaymentSuccess(true);

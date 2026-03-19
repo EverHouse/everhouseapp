@@ -1,19 +1,26 @@
-export const CLUB_TIMEZONE = 'America/Los_Angeles';
+import { CLUB_TIMEZONE } from '../../shared/constants/timezone';
+export { CLUB_TIMEZONE };
+
+export {
+  getTodayPacific,
+  addDaysToPacificDate,
+  parseLocalDate,
+  formatDateDisplay,
+  formatDateDisplayWithDay,
+  formatTime12Hour
+} from '../../shared/utils/dateUtils';
+
+import {
+  getTodayPacific,
+  addDaysToPacificDate,
+  formatDateDisplay,
+  formatDateDisplayWithDay
+} from '../../shared/utils/dateUtils';
 
 function extractDatePart(dateStr: string): string {
   return dateStr.substring(0, 10);
 }
 
-export function parseLocalDate(dateStr: string): Date {
-  if (!dateStr) return new Date();
-  const cleanDate = extractDatePart(dateStr);
-  const [year, month, day] = cleanDate.split('-').map(Number);
-  return new Date(year, month - 1, day);
-}
-
-/**
- * Get day of week (0-6) for a YYYY-MM-DD date using Zeller's algorithm (timezone-agnostic)
- */
 function getDayOfWeek(year: number, month: number, day: number): number {
   let m = month;
   let y = year;
@@ -51,14 +58,6 @@ export function formatDateShort(dateStr: string): string {
   return formatDateLocal(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-export function formatDateDisplay(dateStr: string): string {
-  if (!dateStr) return 'Unknown date';
-  const cleanDate = extractDatePart(String(dateStr));
-  const [, month, day] = cleanDate.split('-').map(Number);
-  if (!month || !day || month < 1 || month > 12) return 'Unknown date';
-  return `${SHORT_MONTHS[month - 1]} ${day}`;
-}
-
 export function formatMemberSince(dateStr: string): string {
   if (!dateStr) return '';
   try {
@@ -76,10 +75,6 @@ export function getDateString(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-export function getTodayPacific(): string {
-  return new Date().toLocaleDateString('en-CA', { timeZone: CLUB_TIMEZONE });
 }
 
 export function getTodayString(): string {
@@ -145,29 +140,6 @@ export function createPacificDate(dateStr: string, timeStr: string): Date {
   return new Date(`${dateStr}T${normalizedTime}${offset}`);
 }
 
-export function addDaysToPacificDate(dateStr: string, days: number): string {
-  if (!dateStr) return getTodayPacific();
-  const [year, month, day] = dateStr.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day + days));
-  return date.toISOString().split('T')[0];
-}
-
-export function formatDateDisplayWithDay(dateStr: string | null | undefined): string {
-  if (!dateStr) return 'Unknown date';
-  const cleanDate = extractDatePart(dateStr);
-  const [year, month, day] = cleanDate.split('-').map(Number);
-  const dayOfWeek = getDayOfWeek(year, month, day);
-  return `${SHORT_DAYS[dayOfWeek]}, ${SHORT_MONTHS[month - 1]} ${day}`;
-}
-
-export function formatTime12Hour(timeStr: string): string {
-  if (!timeStr) return '';
-  const [hours, minutes] = timeStr.substring(0, 5).split(':').map(Number);
-  const period = hours >= 12 ? 'PM' : 'AM';
-  const hour12 = hours % 12 || 12;
-  return `${hour12}:${String(minutes).padStart(2, '0')} ${period}`;
-}
-
 export function formatDateTimePacific(isoString: string | null | undefined): string {
   if (!isoString) return 'Unknown date';
   const date = new Date(isoString);
@@ -223,11 +195,6 @@ function parseDisplayHoursStr(displayStr: string): { open: number; close: number
   return { open, close };
 }
 
-/**
- * Get business hours for a given day of week using display hours settings.
- * Pass displayHours from public settings for settings-driven hours.
- * Falls back to hardcoded defaults if no settings provided.
- */
 export function getBusinessHours(
   dayOfWeek: number,
   displayHours?: { monday?: string; tuesdayThursday?: string; fridaySaturday?: string; sunday?: string }
@@ -252,10 +219,6 @@ export function getBusinessHours(
   }
 }
 
-/**
- * Check if the facility is currently open based on Pacific time.
- * Pass displayHours from public settings for settings-driven hours.
- */
 export function isFacilityOpen(displayHours?: { monday?: string; tuesdayThursday?: string; fridaySaturday?: string; sunday?: string }): { isOpen: boolean; reason?: string } {
   const parts = getPacificDateParts();
   const dayOfWeek = parts.dayOfWeek;
@@ -278,10 +241,6 @@ export function isFacilityOpen(displayHours?: { monday?: string; tuesdayThursday
   return { isOpen: true };
 }
 
-/**
- * Get relative date label for cards (Today, Tomorrow, Yesterday, or formatted date)
- * Optimized for Pacific timezone
- */
 export function getRelativeDateLabel(dateStr: string): string {
   if (!dateStr) return 'Unknown date';
   const today = getTodayPacific();
@@ -304,10 +263,6 @@ export function getRelativeDateLabel(dateStr: string): string {
   return formatDateDisplayWithDay(cleanDate);
 }
 
-/**
- * Format ISO timestamp to friendly relative time for cards
- * Examples: "Just now", "2 hours ago", "Yesterday", "Nov 21"
- */
 export function formatRelativeTime(isoString: string): string {
   if (!isoString) return '';
   
@@ -345,10 +300,6 @@ export function formatRelativeTime(isoString: string): string {
   }
 }
 
-/**
- * Format ISO timestamp for card metadata (compact, friendly format)
- * Example: "Nov 21 at 2:30 PM" or "Today at 2:30 PM"
- */
 export function formatCardTimestamp(isoString: string): string {
   if (!isoString) return '';
   
@@ -375,10 +326,6 @@ export function formatCardTimestamp(isoString: string): string {
   }
 }
 
-/**
- * Format duration in minutes to human-readable string
- * Examples: "45 min", "1 hr", "1.5 hrs", "2 hrs"
- */
 export function formatDuration(minutes: number): string {
   if (!minutes || minutes <= 0) return '';
   

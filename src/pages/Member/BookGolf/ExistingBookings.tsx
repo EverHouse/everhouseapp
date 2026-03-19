@@ -2,7 +2,7 @@ import React from 'react';
 import { haptic } from '../../../utils/haptics';
 import { apiRequestBlob } from '../../../lib/apiRequest';
 import { formatDateShort, formatTime12Hour } from '../../../utils/dateUtils';
-import type { BookingRequest } from '../bookGolf/bookGolfTypes';
+import type { BookingRequest } from './bookGolfTypes';
 
 interface ExistingBookingsProps {
   bookings: BookingRequest[];

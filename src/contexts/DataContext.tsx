@@ -5,7 +5,6 @@ import { MemberDataProvider } from './MemberDataContext';
 import { CafeDataProvider } from './CafeDataContext';
 import { EventDataProvider } from './EventDataContext';
 import { AnnouncementDataProvider } from './AnnouncementDataContext';
-import { BookingDataProvider } from './BookingDataContext';
 
 export type { CafeItem, EventSource, EventData, Announcement, MemberProfile, Booking };
 export type { PaginatedMembersResponse, FetchMembersOptions } from './MemberDataContext';
@@ -19,8 +18,6 @@ export { useCafeData } from './CafeDataContext';
 export { useEventData } from './EventDataContext';
 // eslint-disable-next-line react-refresh/only-export-components
 export { useAnnouncementData } from './AnnouncementDataContext';
-// eslint-disable-next-line react-refresh/only-export-components
-export { useBookingData } from './BookingDataContext';
 
 export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
   return (
@@ -29,9 +26,7 @@ export const DataProvider: React.FC<{children: ReactNode}> = ({ children }) => {
         <CafeDataProvider>
           <EventDataProvider>
             <AnnouncementDataProvider>
-              <BookingDataProvider>
-                {children}
-              </BookingDataProvider>
+              {children}
             </AnnouncementDataProvider>
           </EventDataProvider>
         </CafeDataProvider>

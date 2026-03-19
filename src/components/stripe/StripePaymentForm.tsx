@@ -86,7 +86,8 @@ export function SimpleCheckoutForm({
       } else {
         setIsProcessing(false);
       }
-    }).catch(() => {
+    }).catch((err) => {
+      console.error('[StripePaymentForm] Payment confirmation failed:', err);
       setIsProcessing(false);
     });
   }, [stripe]);
@@ -146,7 +147,6 @@ export function SimpleCheckoutForm({
             },
           }}
           onReady={() => {
-            console.log('[StripePaymentForm] PaymentElement ready');
             setElementReady(true);
           }}
           onLoadError={(event) => {

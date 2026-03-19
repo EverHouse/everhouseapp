@@ -2,7 +2,7 @@ import React from 'react';
 import ModalShell from '../../../components/ModalShell';
 import { GuardianConsentForm, type GuardianConsentData } from '../../../components/booking';
 import { formatDateShort, formatTime12Hour } from '../../../utils/dateUtils';
-import type { BookingRequest } from '../bookGolf/bookGolfTypes';
+import type { BookingRequest } from './bookGolfTypes';
 
 interface BookingModalsProps {
   isDark: boolean;

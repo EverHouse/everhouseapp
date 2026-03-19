@@ -1,6 +1,5 @@
 process.env.TZ = 'America/Los_Angeles';
 
-import './core/suppressWarnings';
 
 import http from 'http';
 import type { Server } from 'http';

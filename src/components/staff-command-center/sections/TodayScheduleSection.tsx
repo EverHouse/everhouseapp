@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import EmptyState from '../../EmptyState';
 import { formatTime12Hour } from '../../../utils/dateUtils';
 import { DateBlock, GlassListRow, getWellnessIcon, getEventIcon, formatTimeLeft } from '../helpers';
-import type { Tour, DBEvent, WellnessClass, TabType, NextScheduleItem, NextActivityItem } from '../types';
+import type { Tour, DBEvent, WellnessClass, TabType, NextActivityItem } from '../types';
 import { tabToPath } from '../../../lib/nav-constants';
 
 interface NextTourWidgetProps {
@@ -234,26 +234,20 @@ const EventsCard: React.FC<EventsCardProps> = ({ isDesktopGrid, isDesktop, upcom
 );
 
 interface TodayScheduleSectionProps {
-  upcomingTours: Tour[];
   upcomingEvents: DBEvent[];
   upcomingWellness: WellnessClass[];
   nextTour: Tour | null;
   nextEvent: DBEvent | WellnessClass | null;
-  nextScheduleItem: NextScheduleItem | null;
   nextActivityItem: NextActivityItem | null;
   today: string;
   variant: 'desktop' | 'desktop-top' | 'desktop-cards' | 'desktop-wellness' | 'desktop-events' | 'mobile' | 'mobile-top' | 'mobile-cards';
 }
 
 export const TodayScheduleSection: React.FC<TodayScheduleSectionProps> = ({
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  upcomingTours,
   upcomingEvents,
   upcomingWellness,
   nextTour,
   nextEvent,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  nextScheduleItem,
   nextActivityItem,
   today,
   variant

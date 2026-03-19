@@ -27,27 +27,15 @@ export interface GuestPasses {
   passes_remaining: number;
 }
 
-export interface UserBooking {
-  id: number;
-  resource_name: string;
-  booking_date: string;
-  start_time: string;
-  end_time: string;
-  status: string;
-}
-
 interface UserState {
   user: UserProfile | null;
   guestPasses: GuestPasses | null;
-  bookings: UserBooking[];
   isHydrated: boolean;
   
   setUser: (user: UserProfile | null) => void;
   clearUser: () => void;
   
   fetchGuestPasses: () => Promise<void>;
-  fetchBookings: () => Promise<void>;
-  fetchNotifications: () => Promise<void>;
   refreshAll: () => Promise<void>;
 }
 
@@ -56,7 +44,6 @@ export const useUserStore = create<UserState>()(
     (set, get) => ({
       user: null,
       guestPasses: null,
-      bookings: [],
       isHydrated: false,
 
       setUser: (user) => {
@@ -69,8 +56,7 @@ export const useUserStore = create<UserState>()(
       clearUser: () => {
         set({ 
           user: null, 
-          guestPasses: null, 
-          bookings: []
+          guestPasses: null
         });
         useNotificationStore.getState().setNotifications([]);
       },
@@ -96,37 +82,9 @@ export const useUserStore = create<UserState>()(
         }
       },
 
-      fetchBookings: async () => {
-        const { user } = get();
-        if (!user?.email) return;
-        
-        try {
-          const { ok, data } = await apiRequest<UserBooking[]>(
-            `/api/bookings?user_email=${encodeURIComponent(user.email)}`
-          );
-          if (ok && data) {
-            set({ bookings: data });
-          }
-          // Silently ignore auth/network errors - session may not be ready
-        } catch {
-          // Silently fail - prevents "Failed to fetch" console spam
-        }
-      },
-
-      fetchNotifications: async () => {
-        const { user } = get();
-        if (!user?.email) return;
-        
-        await useNotificationStore.getState().fetchUnreadCount(user.email);
-      },
-
       refreshAll: async () => {
         const state = get();
-        await Promise.all([
-          state.fetchGuestPasses(),
-          state.fetchBookings(),
-          state.fetchNotifications()
-        ]);
+        await state.fetchGuestPasses();
       }
     }),
     {
