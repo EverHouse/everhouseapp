@@ -9,9 +9,8 @@ interface PullToRefreshProps {
   className?: string;
 }
 
-const PULL_THRESHOLD = 160;
-const MAX_PULL = 240;
-const HEADER_HEIGHT = 80;
+const PULL_THRESHOLD = 100;
+const MAX_PULL = 160;
 const DESKTOP_SETTLE_DELAY = 300;
 
 const isTouchDevice = () => {
@@ -294,7 +293,7 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
       }
 
       if (diffY > 0) {
-        const resistance = 0.33;
+        const resistance = 0.4;
         const distance = Math.min(diffY * resistance, MAX_PULL);
         setPullDistance(distance);
       }
@@ -397,17 +396,11 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
   const pullProgress = Math.min(pullDistance / PULL_THRESHOLD, 1);
   const showPullBar = pullDistance > 5 && !isRefreshing && !isFillingScreen;
 
-  const contentTranslate = (showPullBar && pullDistance > 5) ? pullDistance : 0;
-
   return (
     <div
       ref={containerRef}
       className={`min-h-full ${className}`}
-      style={{ 
-        touchAction: 'manipulation',
-        transform: contentTranslate > 0 ? `translateY(${contentTranslate}px)` : undefined,
-        willChange: contentTranslate > 0 ? 'transform' : undefined,
-      }}
+      style={{ touchAction: 'manipulation' }}
     >
       {showPullBar && createPortal(
         <div 
@@ -418,7 +411,6 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
             style={{
               opacity: pullProgress,
               transform: `scale(${0.7 + pullProgress * 0.3})`,
-              marginTop: `calc(env(safe-area-inset-top, 0px) + ${HEADER_HEIGHT}px + 8px)`
             }}
           >
             <img 
@@ -437,34 +429,36 @@ const PullToRefresh: React.FC<PullToRefreshProps> = ({ children, onRefresh, disa
               top: 0;
               left: 0;
               right: 0;
-              height: calc(env(safe-area-inset-top, 0px) + ${HEADER_HEIGHT}px + ${pullDistance}px);
+              height: ${pullDistance}px;
               background-color: #293515;
-              z-index: 39;
+              z-index: 1500;
               display: flex;
-              align-items: flex-start;
+              align-items: flex-end;
               justify-content: center;
+              padding-bottom: 10px;
               border-radius: 0 0 20px 20px;
               box-shadow: 0 4px 20px rgba(0,0,0,0.3);
               will-change: height;
+              overflow: hidden;
             }
 
             .ptr-pull-content {
               display: flex;
               flex-direction: column;
               align-items: center;
-              gap: 6px;
+              gap: 4px;
               will-change: opacity, transform;
             }
 
             .ptr-pull-mascot {
-              width: 56px;
-              height: 56px;
+              width: 48px;
+              height: 48px;
               object-fit: contain;
             }
 
             .ptr-release-text {
               font-family: 'Instrument Sans', sans-serif;
-              font-size: 12px;
+              font-size: 11px;
               font-weight: 500;
               color: rgba(255,255,255,0.9);
               text-transform: uppercase;

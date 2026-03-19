@@ -2976,15 +2976,15 @@ img[loading="lazy"] {
 }
 
 body[data-ptr-active="true"] header[role="banner"] {
-  transform: translateY(var(--ptr-pull-distance, 0px));
-  will-change: transform;
+  opacity: calc(1 - var(--ptr-progress, 0));
+  pointer-events: none;
+  will-change: opacity;
 }
 
 body[data-ptr-active="true"]:has(.ptr-fill-overlay) header[role="banner"],
 body[data-ptr-active="true"]:has(.ptr-refresh-overlay) header[role="banner"] {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.2s ease-out;
 }
 
 /* Confetti Celebration */
