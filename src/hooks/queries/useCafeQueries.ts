@@ -21,7 +21,7 @@ interface CafeMenuResponse {
 }
 
 interface ImageUploadResponse {
-  url: string;
+  imageUrl: string;
   originalSize: number;
   optimizedSize: number;
 }

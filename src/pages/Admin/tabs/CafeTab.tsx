@@ -60,7 +60,7 @@ const CafeTab: React.FC = () => {
     const handleImageUpload = async (file: File) => {
         try {
             const data = await uploadImageMutation.mutateAsync(file);
-            setNewItem(prev => ({ ...prev, image: data.url }));
+            setNewItem(prev => ({ ...prev, image: data.imageUrl }));
             setUploadResult({ originalSize: data.originalSize, optimizedSize: data.optimizedSize });
         } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'Failed to upload image', 'error');

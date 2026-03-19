@@ -348,7 +348,7 @@ export function initWebSocketServer(server: Server) {
           logger.debug(`[WebSocket] Connection closed - no valid session within timeout`, {
             extra: { event: 'websocket.auth_timeout', reason: 'no_valid_session_within_timeout' }
           });
-          ws.close(4001, 'Authentication timeout');
+          ws.close(4010, 'Authentication required');
         }
       }, AUTH_TIMEOUT_MS);
       

@@ -54,7 +54,17 @@ router.post('/api/hubspot/webhooks', async (req, res) => {
 
           try {
             const hubspot = await getHubSpotClient();
-            const contact = await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.getById(objectId, ['email', 'membership_status', 'membership_tier', 'mindbody_client_id']));
+            let contact;
+            try {
+              contact = await retryableHubSpotRequest(() => hubspot.crm.contacts.basicApi.getById(objectId, ['email', 'membership_status', 'membership_tier', 'mindbody_client_id']));
+            } catch (fetchErr: unknown) {
+              const status = (fetchErr as { code?: number; statusCode?: number })?.code || (fetchErr as { code?: number; statusCode?: number })?.statusCode;
+              if (status === 404) {
+                logger.info('[HubSpot Webhook] Contact not found (deleted/merged) — skipping', { extra: { objectId, propertyName } });
+                continue;
+              }
+              throw fetchErr;
+            }
             const email = contact.properties.email?.toLowerCase();
             const hasMindbodyId = !!(contact.properties as Record<string, string | null>).mindbody_client_id;
             

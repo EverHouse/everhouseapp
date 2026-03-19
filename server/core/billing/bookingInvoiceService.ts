@@ -334,20 +334,34 @@ export async function createDraftInvoiceForBooking(
 
   if (existingInvoiceId) {
     try {
-      const existingInvoice = await stripe.invoices.retrieve(existingInvoiceId);
-      if (existingInvoice.status === 'draft') {
+      let existingInvoice;
+      try {
+        existingInvoice = await stripe.invoices.retrieve(existingInvoiceId);
+      } catch (retrieveErr: unknown) {
+        const stripeErr = retrieveErr as { statusCode?: number };
+        if (stripeErr.statusCode === 404) {
+          logger.warn('[BookingInvoice] Stale invoice reference — invoice not found in Stripe, clearing and creating new draft', {
+            extra: { bookingId, invoiceId: existingInvoiceId }
+          });
+          await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+          existingInvoice = null;
+        } else {
+          throw retrieveErr;
+        }
+      }
+      if (existingInvoice && existingInvoice.status === 'draft') {
         logger.info('[BookingInvoice] Draft invoice already exists, updating instead', {
           extra: { bookingId, invoiceId: existingInvoiceId }
         });
         return updateDraftInvoiceLineItems({ bookingId, sessionId, feeLineItems });
       }
-      if (existingInvoice.status === 'paid') {
+      if (existingInvoice && existingInvoice.status === 'paid') {
         logger.info('[BookingInvoice] Invoice already paid, skipping draft creation', {
           extra: { bookingId, invoiceId: existingInvoiceId }
         });
         return { invoiceId: existingInvoiceId, totalCents: existingInvoice.amount_paid };
       }
-      if (existingInvoice.status === 'open') {
+      if (existingInvoice && existingInvoice.status === 'open') {
         const newTotal = feeLineItems.reduce((sum, li) => sum + li.totalCents, 0);
         if (existingInvoice.amount_due !== newTotal) {
           logger.info('[BookingInvoice] Open invoice amount stale, voiding and recreating', {
@@ -362,7 +376,7 @@ export async function createDraftInvoiceForBooking(
           return { invoiceId: existingInvoiceId, totalCents: existingInvoice.amount_due };
         }
       }
-      if (existingInvoice.status === 'void' || existingInvoice.status === 'uncollectible') {
+      if (existingInvoice && (existingInvoice.status === 'void' || existingInvoice.status === 'uncollectible')) {
         logger.info('[BookingInvoice] Existing invoice is void/uncollectible, clearing reference before creating new draft', {
           extra: { bookingId, invoiceId: existingInvoiceId, status: existingInvoice.status }
         });
@@ -1335,7 +1349,20 @@ export async function syncBookingInvoice(bookingId: number, sessionId: number): 
     }
 
     const stripe = await getStripeClient();
-    const invoice = await stripe.invoices.retrieve(stripeInvoiceId);
+    let invoice;
+    try {
+      invoice = await stripe.invoices.retrieve(stripeInvoiceId);
+    } catch (retrieveErr: unknown) {
+      const stripeErr = retrieveErr as { statusCode?: number };
+      if (stripeErr.statusCode === 404) {
+        logger.warn('[BookingInvoice] syncBookingInvoice: stale invoice reference — invoice not found in Stripe, clearing and retrying', {
+          extra: { bookingId, invoiceId: stripeInvoiceId }
+        });
+        await db.execute(sql`UPDATE booking_requests SET stripe_invoice_id = NULL, updated_at = NOW() WHERE id = ${bookingId}`);
+        return syncBookingInvoice(bookingId, sessionId);
+      }
+      throw retrieveErr;
+    }
     if (invoice.status !== 'draft') {
       if (invoice.status === 'open') {
         logger.warn('[BookingInvoice] syncBookingInvoice skipped: invoice is open (already finalized). Manual review may be needed.', {

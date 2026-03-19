@@ -45,12 +45,16 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
       return;
     }
 
+    let isMounted = true;
+
     const startScanner = async () => {
       await stopScanner();
+
+      if (!isMounted) return;
       
       const containerEl = document.getElementById(elementId);
       if (!containerEl) {
-        setError('Scanner container not found');
+        if (isMounted) setError('Scanner container not found');
         return;
       }
 
@@ -60,6 +64,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
 
       try {
         const cameras = await Html5Qrcode.getCameras();
+        if (!isMounted) return;
         if (!cameras || cameras.length === 0) {
           setError('No cameras found.');
           setCameraPermission('denied');
@@ -67,6 +72,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
         }
 
         const qrScanner = new Html5Qrcode(elementId);
+        if (!isMounted) return;
         qrScannerRef.current = qrScanner;
         setCameraPermission('granted');
 
@@ -87,14 +93,17 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
           () => {}
         );
       } catch (err: unknown) {
-        setError(`Error accessing camera: ${(err instanceof Error ? err.message : String(err))}`);
-        setCameraPermission('denied');
+        if (isMounted) {
+          setError(`Error accessing camera: ${(err instanceof Error ? err.message : String(err))}`);
+          setCameraPermission('denied');
+        }
       }
     };
 
     const timeoutId = setTimeout(startScanner, 100);
     
     return () => {
+      isMounted = false;
       clearTimeout(timeoutId);
     };
   }, [isOpen, elementId, stopScanner]);

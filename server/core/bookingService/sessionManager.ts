@@ -188,13 +188,13 @@ export async function ensureSessionForBooking(params: {
     try {
       const lockKey = `${params.resourceId}::${params.sessionDate}`;
       if (manageLockClient) {
-        await lockClient.query(`SET statement_timeout = '15s'`);
+        await lockClient.query(`SET statement_timeout = '8s'`);
       }
       if (!manageLockClient) {
         await lockClient.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [lockKey]);
       } else {
-        const MAX_LOCK_ATTEMPTS = 6;
-        const LOCK_RETRY_DELAY_MS = 500;
+        const MAX_LOCK_ATTEMPTS = 4;
+        const LOCK_RETRY_BASE_MS = 250;
         let lockAcquired = false;
         for (let attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt++) {
           const lockResult = await lockClient.query(`SELECT pg_try_advisory_lock(hashtext($1)) AS acquired`, [lockKey]);
@@ -203,14 +203,16 @@ export async function ensureSessionForBooking(params: {
             break;
           }
           if (attempt < MAX_LOCK_ATTEMPTS - 1) {
-            logger.info(`[SessionManager] Advisory lock contention on ${lockKey}, retry ${attempt + 1}/${MAX_LOCK_ATTEMPTS}`, {
+            const jitter = Math.floor(Math.random() * 100);
+            const delay = LOCK_RETRY_BASE_MS * Math.pow(2, attempt) + jitter;
+            logger.info(`[SessionManager] Advisory lock contention on ${lockKey}, retry ${attempt + 1}/${MAX_LOCK_ATTEMPTS} (delay ${delay}ms)`, {
               extra: { bookingId: params.bookingId, resourceId: params.resourceId }
             });
-            await new Promise(resolve => setTimeout(resolve, LOCK_RETRY_DELAY_MS));
+            await new Promise(resolve => setTimeout(resolve, delay));
           }
         }
         if (!lockAcquired) {
-          throw new Error(`Advisory lock timeout: could not acquire lock for ${lockKey} after ${MAX_LOCK_ATTEMPTS} attempts`);
+          throw new Error(`Advisory lock timeout: could not acquire lock for ${lockKey} after ${MAX_LOCK_ATTEMPTS} attempts. Another booking approval for this bay/day may be in progress — please retry.`);
         }
       }
       try {

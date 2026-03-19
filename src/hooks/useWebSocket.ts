@@ -229,10 +229,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}) {
           wsRef.current = null;
         }
         
-        if (event.code >= 4001 && event.code <= 4003) {
+        const PERMANENT_CLOSE_CODES = [4001, 4002, 4003, 4008, 4010];
+        if (PERMANENT_CLOSE_CODES.includes(event.code)) {
           authRejectedRef.current = true;
           intentionalCloseRef.current = true;
-          console.warn(`[WebSocket] Auth failed (${event.code}) - stopping reconnection`);
+          console.warn(`[WebSocket] Auth permanently rejected (${event.code}: ${event.reason}) - stopping reconnection`);
         }
         
         if (emailToUse && !intentionalCloseRef.current && wsRef.current === null) {

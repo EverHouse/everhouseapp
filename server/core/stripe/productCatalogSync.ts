@@ -245,6 +245,11 @@ export async function syncCafeItemsToStripe(): Promise<{
           });
           stripePriceId = newPrice.id;
           logger.info(`[Cafe Sync] Created price for ${itemName}: ${stripePriceId}`);
+
+          await stripe.products.update(stripeProductId as string, {
+            default_price: stripePriceId,
+          });
+          logger.info(`[Cafe Sync] Updated default_price for ${itemName} to ${stripePriceId}`);
         }
 
         await db.execute(sql`UPDATE cafe_items SET stripe_product_id = ${stripeProductId}, stripe_price_id = ${stripePriceId} WHERE id = ${itemId}`);
