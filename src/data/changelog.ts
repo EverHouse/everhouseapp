@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.87.98",
+    date: "2026-03-19",
+    title: "Scheduler Reliability, Sync Race Conditions & HubSpot Safety (Full Audit Pass)",
+    changes: [
+      "Fixed: Events and wellness calendar sync now use optimistic locking during push-back — edits made while a push is in progress are no longer silently lost",
+      "Fixed: Google Calendar events and wellness classes no longer retain stale extended properties when optional fields (image, URL, category, etc.) are removed in the app",
+      "Fixed: Six additional schedulers (morning closures, daily reminders, Trackman check, Stripe reconciliation, duplicate cleanup, weekly cleanup) now use an hour-range window instead of exact-hour matching to prevent missed runs from timer drift",
+      "Fixed: Duplicate cleanup scheduler now clears its last-run memory on failure so it can retry at the next opportunity",
+      "Fixed: HubSpot member sync (syncMemberToHubSpot) now restores lifecycle stage if the contact update fails after clearing it — prevents contacts from being left with a blank lifecycle",
+      "Fixed: HubSpot day pass sync now restores the previous lifecycle stage if the update fails after clearing it",
+      "Improved: WebSocket token endpoint now rate-limited to prevent abuse",
+    ]
+  },
+  {
     version: "8.87.97",
     date: "2026-03-19",
     title: "Calendar Sync Hardening & Extended Property Fixes",

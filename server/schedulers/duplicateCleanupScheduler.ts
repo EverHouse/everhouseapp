@@ -72,7 +72,7 @@ async function checkAndRunCleanup(): Promise<void> {
     const currentHour = getPacificHour();
     const todayStr = getTodayPacific();
     
-    if (currentHour === CLEANUP_HOUR && lastCleanupDate !== todayStr) {
+    if (currentHour >= CLEANUP_HOUR && currentHour < CLEANUP_HOUR + 3 && lastCleanupDate !== todayStr) {
       logger.info('[Duplicate Cleanup] Running scheduled cleanup...');
       const result = await cleanupDuplicateTrackmanBookings();
       lastCleanupDate = todayStr;
@@ -84,6 +84,7 @@ async function checkAndRunCleanup(): Promise<void> {
   } catch (error: unknown) {
     logger.error('[Duplicate Cleanup] Scheduler error:', { error: error as Error });
     schedulerTracker.recordRun('Duplicate Cleanup', false, String(error));
+    lastCleanupDate = '';
   } finally {
     isRunning = false;
   }

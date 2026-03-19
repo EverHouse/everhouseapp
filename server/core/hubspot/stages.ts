@@ -261,11 +261,13 @@ export async function syncMemberToHubSpot(
       return { success: true, contactId, updated };
     }
     
+    let lifecycleCleared = false;
     if (targetLifecycleStage) {
       try {
         await retryableHubSpotRequest(() =>
           hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: '' } })
         );
+        lifecycleCleared = true;
       } catch (clearError: unknown) {
         logger.warn(`[HubSpot Sync] Could not clear lifecyclestage for ${email} before setting to '${targetLifecycleStage}':`, { error: clearError });
       }
@@ -298,6 +300,16 @@ export async function syncMemberToHubSpot(
           );
           logger.info(`[HubSpot Sync] Updated ${email}: ${JSON.stringify(validProperties)}`);
           return { success: true, contactId, updated };
+        }
+      }
+      if (lifecycleCleared && targetLifecycleStage) {
+        try {
+          await retryableHubSpotRequest(() =>
+            hubspot.crm.contacts.basicApi.update(contactId, { properties: { lifecyclestage: targetLifecycleStage! } })
+          );
+          logger.warn(`[HubSpot Sync] Restored lifecyclestage to '${targetLifecycleStage}' for ${email} after update failure`);
+        } catch (restoreError: unknown) {
+          logger.error(`[HubSpot Sync] Failed to restore lifecyclestage for ${email} after update failure:`, { error: restoreError });
         }
       }
       throw updateError;

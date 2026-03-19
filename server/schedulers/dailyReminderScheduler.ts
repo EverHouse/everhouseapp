@@ -66,7 +66,7 @@ async function checkAndSendReminders(): Promise<void> {
     const todayStr = getTodayPacific();
     
     const reminderHour = Number(await getSettingValue('scheduling.daily_reminder_hour', String(DEFAULT_REMINDER_HOUR)));
-    if (currentHour === reminderHour) {
+    if (currentHour >= reminderHour && currentHour < reminderHour + 2) {
       const claimed = await tryClaimReminderSlot(todayStr);
       
       if (claimed) {

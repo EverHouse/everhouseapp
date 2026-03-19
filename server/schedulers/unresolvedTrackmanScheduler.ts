@@ -65,7 +65,7 @@ async function checkUnresolvedTrackmanBookings(): Promise<void> {
     const currentHour = getPacificHour();
     const todayStr = getTodayPacific();
     
-    if (currentHour === UNRESOLVED_TRACKMAN_CHECK_HOUR) {
+    if (currentHour >= UNRESOLVED_TRACKMAN_CHECK_HOUR && currentHour < UNRESOLVED_TRACKMAN_CHECK_HOUR + 2) {
       const claimed = await tryClaimUnresolvedTrackmanSlot(todayStr);
       
       if (claimed) {

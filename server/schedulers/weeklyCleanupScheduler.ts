@@ -21,7 +21,7 @@ async function checkAndRunCleanup(): Promise<void> {
     const currentHour = parts.hour;
     const currentWeek = Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
     
-    if (currentDay === CLEANUP_DAY && currentHour === CLEANUP_HOUR && currentWeek !== lastCleanupWeek) {
+    if (currentDay === CLEANUP_DAY && currentHour >= CLEANUP_HOUR && currentHour < CLEANUP_HOUR + 3 && currentWeek !== lastCleanupWeek) {
       logger.info('[Cleanup] Starting weekly cleanup...');
       
       const { runScheduledCleanup } = await import('../core/databaseCleanup');

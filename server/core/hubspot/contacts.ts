@@ -295,10 +295,12 @@ export async function syncDayPassPurchaseToHubSpot(
         const currentLifecycle = searchResponse.results[0].properties?.lifecyclestage?.toLowerCase() || '';
         
         if (currentLifecycle !== 'customer' && currentLifecycle !== 'lead') {
+          let dayPassLifecycleCleared = false;
           try {
             await retryableHubSpotRequest(() =>
               hubspot.crm.contacts.basicApi.update(contactId!, { properties: { lifecyclestage: '' } })
             );
+            dayPassLifecycleCleared = true;
             const updateProps: Record<string, string> = {
               lifecyclestage: 'lead',
               hs_lead_status: 'NEW'
@@ -315,6 +317,16 @@ export async function syncDayPassPurchaseToHubSpot(
             logger.info(`[DayPassHubSpot] Updated existing contact ${contactId} lifecycle to 'lead' for ${normalizedEmail}`);
           } catch (updateErr: unknown) {
             logger.warn(`[DayPassHubSpot] Failed to update lifecycle for existing contact ${contactId}:`, { error: updateErr });
+            if (dayPassLifecycleCleared && currentLifecycle) {
+              try {
+                await retryableHubSpotRequest(() =>
+                  hubspot.crm.contacts.basicApi.update(contactId!, { properties: { lifecyclestage: currentLifecycle } })
+                );
+                logger.warn(`[DayPassHubSpot] Restored lifecyclestage to '${currentLifecycle}' for ${normalizedEmail} after update failure`);
+              } catch (restoreErr: unknown) {
+                logger.error(`[DayPassHubSpot] Failed to restore lifecyclestage for ${normalizedEmail}:`, { error: restoreErr });
+              }
+            }
           }
         }
         

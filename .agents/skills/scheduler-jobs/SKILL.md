@@ -69,11 +69,10 @@ All schedulers registered in `server/schedulers/index.ts` via `initSchedulers()`
 | Pattern | When to use | How |
 |---|---|---|
 | Time Gate (deprecated) | Exact hour match — **AVOID** (drift-prone) | `if (getPacificHour() !== TARGET) return` |
-| Date-Windowed Time Gate (v8.87.96) | Once-per-day within an hour range | `const hour = getPacificHour(); if (hour < START || hour >= END) return; if (lastRunDate === getTodayPacific()) return;` Reset `lastRunDate = null` in catch for same-day retry |
-| Claim Slot (DB) | Once per day/month, crash-safe | `INSERT INTO system_settings ON CONFLICT DO UPDATE WHERE value IS DISTINCT FROM <key>` |
-| Local Variable | Simple hour gate, non-critical | `lastCleanupDate` in memory vs `getTodayPacific()` |
+| Hour-Range + DB Claim Slot (v8.87.98) | Once per day, crash-safe, drift-safe | `if (hour >= TARGET && hour < TARGET + 2)` + `tryClaimXxxSlot(today)` DB INSERT ON CONFLICT |
+| Hour-Range + Local Variable (v8.87.98) | Once per day, lightweight | `if (hour >= TARGET && hour < TARGET + N && lastDate !== today)` + reset `lastDate = ''` in catch |
 | Yearly Gate | Once per year | Month + day-of-month check + year key claim slot |
-| Weekly Gate | Once per week | `getDay() === 0` + hour + week-number tracking |
+| Weekly Gate | Once per week | `getDay() === 0` + hour-range + week-number tracking |
 
 See [references/idempotency-patterns.md](references/idempotency-patterns.md) for code examples.
 

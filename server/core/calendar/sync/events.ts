@@ -257,6 +257,12 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 }
               }
               
+              const eventOptionalKeys = ['ehApp_imageUrl', 'ehApp_externalUrl', 'ehApp_maxAttendees', 'ehApp_visibility', 'ehApp_requiresRsvp', 'ehApp_location', 'ehApp_category'];
+              const mergedEventProps: Record<string, string | null> = { ...extProps, ...extendedProps };
+              for (const key of eventOptionalKeys) {
+                if (!extendedProps[key] && extProps[key]) mergedEventProps[key] = null;
+              }
+
               const patchResult = await withCalendarRetry(() => calendar.events.patch({
                 calendarId,
                 eventId: googleEventId,
@@ -273,7 +279,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                     timeZone: 'America/Los_Angeles',
                   } : undefined,
                   extendedProperties: {
-                    shared: extendedProps,
+                    shared: mergedEventProps,
                   },
                 },
               }), `events-patch-event-${dbRow.id}`);
@@ -281,10 +287,14 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;
               
-              await db.execute(sql`UPDATE events SET last_synced_at = NOW(), locally_edited = false, 
+              const clearResult = await db.execute(sql`UPDATE events SET last_synced_at = NOW(), locally_edited = false, 
                  google_event_etag = ${newEtag}, google_event_updated_at = ${newUpdatedAt}, app_last_modified_at = NULL 
-                 WHERE id = ${dbRow.id}`);
-              pushedToCalendar++;
+                 WHERE id = ${dbRow.id} AND (app_last_modified_at IS NOT DISTINCT FROM ${appModifiedAt})`);
+              if ((clearResult as { rowCount?: number }).rowCount === 0) {
+                logger.warn(`[Events Sync] Event #${dbRow.id} was re-edited during push-back; keeping locally_edited=true for next sync`);
+              } else {
+                pushedToCalendar++;
+              }
             } catch (pushError: unknown) {
               logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: pushError });
             }

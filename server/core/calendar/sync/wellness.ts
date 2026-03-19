@@ -324,6 +324,12 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               if (dbRow.spots) extendedProps['ehApp_spots'] = dbRow.spots as string;
               if (dbRow.status) extendedProps['ehApp_status'] = dbRow.status as string;
               
+              const wellnessOptionalKeys = ['ehApp_imageUrl', 'ehApp_externalUrl', 'ehApp_category', 'ehApp_duration', 'ehApp_spots', 'ehApp_status'];
+              const mergedWellnessProps: Record<string, string | null> = { ...extProps, ...extendedProps };
+              for (const key of wellnessOptionalKeys) {
+                if (!extendedProps[key] && extProps[key]) mergedWellnessProps[key] = null;
+              }
+
               const patchResult = await withCalendarRetry(() => calendar.events.patch({
                 calendarId,
                 eventId: googleEventId,
@@ -339,7 +345,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                     timeZone: 'America/Los_Angeles',
                   },
                   extendedProperties: {
-                    shared: extendedProps,
+                    shared: mergedWellnessProps,
                   },
                 },
               }), `wellness-patch-class-${dbRow.id}`);
@@ -347,10 +353,14 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
               const newEtag = patchResult.data.etag || null;
               const newUpdatedAt = patchResult.data.updated ? new Date(patchResult.data.updated) : null;
               
-              await db.execute(sql`UPDATE wellness_classes SET last_synced_at = NOW(), locally_edited = false,
+              const wellnessClearResult = await db.execute(sql`UPDATE wellness_classes SET last_synced_at = NOW(), locally_edited = false,
                  google_event_etag = ${newEtag}, google_event_updated_at = ${newUpdatedAt}, app_last_modified_at = NULL
-                 WHERE id = ${dbRow.id}`);
-              pushedToCalendar++;
+                 WHERE id = ${dbRow.id} AND (app_last_modified_at IS NOT DISTINCT FROM ${appModifiedAt})`);
+              if ((wellnessClearResult as { rowCount?: number }).rowCount === 0) {
+                logger.warn(`[Wellness Sync] Class #${dbRow.id} was re-edited during push-back; keeping locally_edited=true for next sync`);
+              } else {
+                pushedToCalendar++;
+              }
             } catch (pushError: unknown) {
               logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: pushError });
             }

@@ -70,7 +70,7 @@ async function checkAndRunReconciliation(): Promise<void> {
     const currentHour = getPacificHour();
     const todayStr = getTodayPacific();
     
-    if (currentHour === RECONCILIATION_HOUR) {
+    if (currentHour >= RECONCILIATION_HOUR && currentHour < RECONCILIATION_HOUR + 2) {
       const claimed = await tryClaimReconciliationSlot(todayStr);
       
       if (claimed) {

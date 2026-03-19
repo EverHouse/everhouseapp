@@ -1267,7 +1267,7 @@ router.get('/api/auth/session', async (req, res) => {
   });
 });
 
-router.post('/api/auth/ws-token', async (req, res) => {
+router.post('/api/auth/ws-token', authRateLimiterByIp, async (req, res) => {
   const sessionUser = getSessionUser(req);
   if (!sessionUser?.email) {
     return res.status(401).json({ error: 'Not authenticated' });

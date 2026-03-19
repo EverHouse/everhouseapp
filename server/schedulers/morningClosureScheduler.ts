@@ -66,7 +66,7 @@ async function checkAndSendMorningNotifications(): Promise<void> {
     const todayStr = getTodayPacific();
     
     const morningHour = Number(await getSettingValue('scheduling.morning_closure_hour', String(DEFAULT_MORNING_HOUR)));
-    if (currentHour === morningHour) {
+    if (currentHour >= morningHour && currentHour < morningHour + 2) {
       const claimed = await tryClaimMorningSlot(todayStr);
       
       if (claimed) {
