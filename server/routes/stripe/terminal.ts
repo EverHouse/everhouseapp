@@ -639,11 +639,11 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
       return res.status(400).json({ error: 'User ID is required' });
     }
     
-    const userCheck = await db.execute(sql`SELECT id, email, membership_status FROM users WHERE id = ${userId}`);
+    const userCheck = await db.execute(sql`SELECT id, email, membership_status, stripe_customer_id FROM users WHERE id = ${userId}`);
     if (userCheck.rows.length === 0) {
       return res.status(400).json({ error: 'User not found. Cannot process payment without a linked member account.' });
     }
-    const pendingUser = userCheck.rows[0] as { id: string; email: string; membership_status: string };
+    const pendingUser = userCheck.rows[0] as { id: string; email: string; membership_status: string; stripe_customer_id: string | null };
     const pendingUserStatus = pendingUser.membership_status as string;
     const allowedStatuses = ['pending', 'incomplete'];
     if (!allowedStatuses.includes(pendingUserStatus)) {
@@ -657,6 +657,13 @@ router.post('/api/stripe/terminal/process-subscription-payment', isStaffOrAdmin,
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['latest_invoice.payment_intent']
     });
+
+    const subCustomerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id || '';
+    if (pendingUser.stripe_customer_id && subCustomerId && pendingUser.stripe_customer_id !== subCustomerId) {
+      return res.status(400).json({
+        error: 'Subscription does not belong to this member. Cannot process payment for a mismatched subscription.'
+      });
+    }
     
     const invoice = subscription.latest_invoice as Stripe.Invoice;
     if (!invoice) {
@@ -986,6 +993,14 @@ router.post('/api/stripe/terminal/confirm-subscription-payment', isStaffOrAdmin,
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
       expand: ['latest_invoice']
     });
+
+    const subCustomerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer?.id || '';
+    if (existingUser.stripeCustomerId && subCustomerId && existingUser.stripeCustomerId !== subCustomerId) {
+      return res.status(400).json({
+        error: 'Subscription does not belong to this member. Activation blocked to prevent billing mismatch.'
+      });
+    }
+
     const latestInvoice = subscription.latest_invoice as Stripe.Invoice;
     const actualInvoiceId = latestInvoice?.id || invoiceId;
     

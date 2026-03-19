@@ -326,7 +326,9 @@ export function PaymentStep({
                           })
                         }, { maxRetries: 1 });
                         if (!confirmResult.ok) {
-                          if (!confirmResult.errorData?.autoRefunded) {
+                          if (confirmResult.errorData?.reconciliationFailed) {
+                            showToast(`${confirmResult.error || 'Invoice reconciliation failed. Payment was collected but membership was NOT activated. Please resolve in Stripe and retry.'}`, 'error');
+                          } else if (!confirmResult.errorData?.autoRefunded) {
                             try {
                               await apiRequest('/api/stripe/terminal/refund-payment', {
                                 method: 'POST',
