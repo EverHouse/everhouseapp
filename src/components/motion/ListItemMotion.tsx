@@ -27,7 +27,7 @@ const getStaggerDelayClass = (index: number): string => {
   return `animate-list-item-delay-${index}`;
 };
 
-export const MotionListItem: React.FC<MotionListItemProps> = ({ 
+export const MotionListItem: React.FC<MotionListItemProps> = React.memo(({ 
   children, 
   className, 
   onClick,
@@ -48,7 +48,9 @@ export const MotionListItem: React.FC<MotionListItemProps> = ({
       {children}
     </div>
   );
-};
+});
+
+MotionListItem.displayName = 'MotionListItem';
 
 interface AnimatedPageProps {
   children: React.ReactNode;

@@ -12,7 +12,7 @@ const router = Router();
 router.get('/api/admin/inquiries', isStaffOrAdmin, async (req, res) => {
   try {
     const { status, formType, limit: limitParam } = req.query;
-    const queryLimit = Math.min(Math.max(parseInt(limitParam as string, 10) || 500, 1), 5000);
+    const queryLimit = Math.min(Math.max(parseInt(limitParam as string, 10) || 500, 1), 1000);
     
     const conditions: SQL[] = [
       ne(formSubmissions.formType, 'membership'),

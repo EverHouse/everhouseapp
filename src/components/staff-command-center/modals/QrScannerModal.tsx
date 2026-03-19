@@ -1,5 +1,4 @@
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { Html5Qrcode, Html5QrcodeScannerState } from 'html5-qrcode';
 import ModalShell from '../../ModalShell';
 
 interface QrScannerModalProps {
@@ -8,8 +7,19 @@ interface QrScannerModalProps {
   onScanSuccess: (decodedText: string) => void;
 }
 
+interface Html5QrcodeInstance {
+  getState(): number;
+  stop(): Promise<void>;
+  start(
+    camera: { facingMode: string },
+    config: { fps: number; qrbox: { width: number; height: number }; aspectRatio: number },
+    onSuccess: (decodedText: string) => void,
+    onFailure: () => void
+  ): Promise<null | void>;
+}
+
 const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScanSuccess }) => {
-  const qrScannerRef = useRef<Html5Qrcode | null>(null);
+  const qrScannerRef = useRef<Html5QrcodeInstance | null>(null);
   const hasScannedRef = useRef(false);
   const onScanSuccessRef = useRef(onScanSuccess);
   const onCloseRef = useRef(onClose);
@@ -24,6 +34,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
   const stopScanner = useCallback(async () => {
     if (qrScannerRef.current) {
       try {
+        const { Html5QrcodeScannerState } = await import('html5-qrcode');
         const state = qrScannerRef.current.getState();
         if (state === Html5QrcodeScannerState.SCANNING || state === Html5QrcodeScannerState.PAUSED) {
           await qrScannerRef.current.stop();
@@ -63,6 +74,7 @@ const QrScannerModal: React.FC<QrScannerModalProps> = ({ isOpen, onClose, onScan
       hasScannedRef.current = false;
 
       try {
+        const { Html5Qrcode } = await import('html5-qrcode');
         const cameras = await Html5Qrcode.getCameras();
         if (!isMounted) return;
         if (!cameras || cameras.length === 0) {

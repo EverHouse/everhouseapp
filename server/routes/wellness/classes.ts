@@ -67,7 +67,8 @@ router.post('/api/wellness-classes/backfill-calendar', isStaffOrAdmin, async (re
         isNull(wellnessClasses.googleCalendarId),
         gte(wellnessClasses.date, getTodayPacific())
       ))
-      .orderBy(asc(wellnessClasses.date));
+      .orderBy(asc(wellnessClasses.date))
+      .limit(500);
     
     const convertTo24Hour = (timeStr: string): string => {
       const match12h = timeStr.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
@@ -314,7 +315,7 @@ router.get('/api/wellness-classes', async (req, res) => {
     if (sqlConditions.length > 0) {
       fullQuery = sql`${baseQuery} WHERE ${sql.join(sqlConditions, sql` AND `)}`;
     }
-    fullQuery = sql`${fullQuery} ORDER BY wc.date ASC, wc.time ASC`;
+    fullQuery = sql`${fullQuery} ORDER BY wc.date ASC, wc.time ASC LIMIT 500`;
     
     const result = await db.execute(fullQuery);
     res.json(result.rows);

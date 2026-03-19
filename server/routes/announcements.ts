@@ -137,7 +137,7 @@ router.get('/api/announcements/banner', async (req, res) => {
 router.get('/api/announcements/export', isStaffOrAdmin, async (req, res) => {
   try {
     // Fetch all announcements
-    const results = await db.select().from(announcements).orderBy(desc(announcements.createdAt));
+    const results = await db.select().from(announcements).orderBy(desc(announcements.createdAt)).limit(500);
     
     // Helper function to escape CSV values
     const escapeCsv = (value: unknown): string => {

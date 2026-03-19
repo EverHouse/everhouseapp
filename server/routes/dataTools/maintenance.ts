@@ -302,45 +302,67 @@ router.post('/api/data-tools/sync-visit-counts', isAdmin, async (req: Request, r
     for (let i = 0; i < membersWithHubspot.rows.length; i += BATCH_SIZE) {
       const batch = membersWithHubspot.rows.slice(i, i + BATCH_SIZE) as unknown as DbUserRow[];
       
+      const batchEmails = batch.map((m) => m.email.toLowerCase());
+      const batchIds = batch.map((m) => m.id);
+
+      const [bulkBookingRows, bulkEventRows, bulkWellnessRows] = await Promise.all([
+        db.execute(sql`
+          SELECT norm_email, COUNT(DISTINCT booking_id) as count FROM (
+            SELECT LOWER(user_email) as norm_email, id as booking_id FROM booking_requests
+            WHERE LOWER(user_email) = ANY(${batchEmails})
+              AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+              AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+            UNION
+            SELECT LOWER(u.email) as norm_email, br.id as booking_id FROM booking_requests br
+            JOIN booking_participants bp ON bp.session_id = br.session_id
+            JOIN users u ON bp.user_id = u.id
+            WHERE u.id = ANY(${batchIds})
+              AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+              AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
+          ) all_bookings
+          GROUP BY norm_email
+        `),
+        db.execute(sql`
+          SELECT COALESCE(LOWER(er.user_email), LOWER(u.email)) as norm_email, COUNT(*) as count
+          FROM event_rsvps er
+          JOIN events e ON er.event_id = e.id
+          LEFT JOIN users u ON er.matched_user_id = u.id
+          WHERE (LOWER(er.user_email) = ANY(${batchEmails}) OR er.matched_user_id = ANY(${batchIds}))
+            AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+            AND er.status != 'cancelled'
+          GROUP BY COALESCE(LOWER(er.user_email), LOWER(u.email))
+        `),
+        db.execute(sql`
+          SELECT LOWER(we.user_email) as norm_email, COUNT(*) as count
+          FROM wellness_enrollments we
+          JOIN wellness_classes wc ON we.class_id = wc.id
+          WHERE LOWER(we.user_email) = ANY(${batchEmails})
+            AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+            AND we.status != 'cancelled'
+          GROUP BY LOWER(we.user_email)
+        `),
+      ]);
+
+      const bookingCountMap = new Map<string, number>();
+      for (const row of bulkBookingRows.rows as Array<{ norm_email: string; count: string }>) {
+        bookingCountMap.set(row.norm_email, parseInt(row.count || '0', 10));
+      }
+      const eventCountMap = new Map<string, number>();
+      for (const row of bulkEventRows.rows as Array<{ norm_email: string; count: string }>) {
+        if (row.norm_email) eventCountMap.set(row.norm_email, parseInt(row.count || '0', 10));
+      }
+      const wellnessCountMap = new Map<string, number>();
+      for (const row of bulkWellnessRows.rows as Array<{ norm_email: string; count: string }>) {
+        wellnessCountMap.set(row.norm_email, parseInt(row.count || '0', 10));
+      }
+
       await Promise.all(batch.map(async (member) => {
         try {
           const normalizedEmail = member.email.toLowerCase();
-          
-          const visitCountResult = await db.execute(sql`
-            SELECT COUNT(DISTINCT booking_id) as count FROM (
-              SELECT id as booking_id FROM booking_requests
-              WHERE LOWER(user_email) = ${normalizedEmail}
-                AND request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-                AND status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
-              UNION
-              SELECT br.id as booking_id FROM booking_requests br
-              JOIN booking_participants bp ON bp.session_id = br.session_id
-              JOIN users u ON bp.user_id = u.id
-              WHERE LOWER(u.email) = ${normalizedEmail}
-                AND br.request_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-                AND br.status NOT IN ('cancelled', 'declined', 'cancellation_pending', 'deleted')
-            ) all_bookings
-          `);
-          
-          const eventCountResult = await db.execute(sql`
-            SELECT COUNT(*) as count FROM event_rsvps er
-            JOIN events e ON er.event_id = e.id
-            WHERE (LOWER(er.user_email) = ${normalizedEmail} OR er.matched_user_id = ${member.id})
-              AND e.event_date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-              AND er.status != 'cancelled'
-          `);
-          
-          const wellnessCountResult = await db.execute(sql`
-            SELECT COUNT(*) as count FROM wellness_enrollments we
-            JOIN wellness_classes wc ON we.class_id = wc.id
-            WHERE LOWER(we.user_email) = ${normalizedEmail}
-              AND wc.date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
-              AND we.status != 'cancelled'
-          `);
-          
-          const bookingCount = parseInt((visitCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
-          const eventCount = parseInt((eventCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
-          const wellnessCount = parseInt((wellnessCountResult.rows[0] as unknown as DbCountRow)?.count || '0', 10);
+
+          const bookingCount = bookingCountMap.get(normalizedEmail) ?? 0;
+          const eventCount = eventCountMap.get(normalizedEmail) ?? 0;
+          const wellnessCount = wellnessCountMap.get(normalizedEmail) ?? 0;
           const appVisitCount = bookingCount + eventCount + wellnessCount;
           
           let hubspotVisitCount: number | null = null;
