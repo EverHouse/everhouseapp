@@ -2,6 +2,11 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.7] - 2026-03-20
+
+### CSP Style Fix
+- **Fixed**: Restored `'unsafe-inline'` to the Content Security Policy `style-src` directive. It had been accidentally dropped, causing browsers to block React inline styles and breaking page layout. This is a documented trade-off required by React inline styles and third-party widget CSS.
+
 ## [8.94.6] - 2026-03-20
 
 ### Error Logging Safety Sweep

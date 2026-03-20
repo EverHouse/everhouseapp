@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.7",
+    date: "2026-03-20",
+    title: "CSP Style Fix",
+    changes: [
+      "Fixed: Restored 'unsafe-inline' to the Content Security Policy style-src directive — React inline styles were being blocked by the browser, breaking page layout",
+    ]
+  },
+  {
     version: "8.94.6",
     date: "2026-03-20",
     title: "Error Logging Safety Sweep",
