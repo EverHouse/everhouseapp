@@ -368,9 +368,29 @@ const KioskCheckin: React.FC = () => {
   }, []);
 
   const handlePasscodeKeyDown = useCallback((index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (/^\d$/.test(e.key)) {
+      e.preventDefault();
+      setPasscodeError(false);
+      setPasscodeDigits(prev => {
+        const newDigits = [...prev];
+        newDigits[index] = e.key;
+        return newDigits;
+      });
+      if (index < 3) {
+        setTimeout(() => passcodeInputRefs.current[index + 1]?.focus(), 0);
+      }
+      return;
+    }
     if (e.key === 'Backspace') {
+      e.preventDefault();
       const currentDigit = passcodeDigitsRef.current[index];
-      if (!currentDigit && index > 0) {
+      if (currentDigit) {
+        setPasscodeDigits(prev => {
+          const newDigits = [...prev];
+          newDigits[index] = '';
+          return newDigits;
+        });
+      } else if (index > 0) {
         setPasscodeDigits(prev => {
           const newDigits = [...prev];
           newDigits[index - 1] = '';
@@ -378,6 +398,7 @@ const KioskCheckin: React.FC = () => {
         });
         setTimeout(() => passcodeInputRefs.current[index - 1]?.focus(), 0);
       }
+      return;
     }
     if (e.key === 'Enter') {
       handlePasscodeSubmit(passcodeDigitsRef.current);
@@ -637,8 +658,9 @@ const KioskCheckin: React.FC = () => {
                 <input
                   key={i}
                   ref={el => { passcodeInputRefs.current[i] = el; }}
-                  type="password"
+                  type="tel"
                   inputMode="numeric"
+                  pattern="[0-9]*"
                   maxLength={1}
                   value={digit}
                   onChange={e => handlePasscodeDigitChange(i, e.target.value)}
@@ -652,6 +674,7 @@ const KioskCheckin: React.FC = () => {
                         : 'border-white/15 focus:border-[#CCB8E4]/40'
                   } disabled:opacity-50`}
                   autoComplete="off"
+                  style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
                 />
               ))}
             </div>
