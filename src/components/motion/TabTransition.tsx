@@ -16,6 +16,11 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
   const isFirstRender = useRef(true);
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const enterTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const frozenChildrenRef = useRef<React.ReactNode>(children);
+
+  if (animationPhase !== 'exiting') {
+    frozenChildrenRef.current = children;
+  }
 
   useEffect(() => {
     if (isFirstRender.current) {
@@ -51,9 +56,11 @@ export const TabTransition: React.FC<TabTransitionProps> = ({
     animationPhase === 'exiting' ? 'animate-tab-exit' :
     animationPhase === 'entering' ? 'animate-tab-enter' : '';
 
+  const renderedChildren = animationPhase === 'exiting' ? frozenChildrenRef.current : children;
+
   return (
     <div className={`${animationClass} ${className}`}>
-      {children}
+      {renderedChildren}
     </div>
   );
 };

@@ -161,7 +161,7 @@ const History: React.FC = () => {
         </section>
 
         <TabTransition activeKey={activeTab}>
-        <div className="relative z-10 animate-content-enter-delay-3">
+        <div className="relative z-10">
           {isLoading ? (
             <PageLoadingSpinner />
           ) : activeTab === 'visits' ? (

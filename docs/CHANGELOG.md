@@ -5,11 +5,11 @@ All notable changes to the Ever Club Members App are documented here.
 ## [8.94.3] - 2026-03-20
 
 ### Tab Switch Glitch Fixes
-- **Fixed**: Removed double animation on BookGolf tab switch — `TabTransition` already handles the fade-through animation, but the inner content div also had `animate-content-enter` (a separate 400ms slide-up animation), causing two competing animations to run simultaneously and creating a visible flicker on every tab switch.
-- **Fixed**: Removed the same double animation conflict on Wellness tab switch (Classes ↔ MedSpa). The `animate-content-enter` class on the inner wrapper inside `TabTransition` was redundant and caused the glitch.
+- **Fixed**: `TabTransition` component now freezes old children during the exit phase. Previously, React re-rendered the new tab content immediately when `activeKey` changed, so the exit animation was fading out the **new** content then fading it back in — causing a visible flash/glitch on every tab switch. Now uses a `frozenChildrenRef` to hold the old content during exit, swap to new content only when entering. Affects all pages using `TabTransition`: BookGolf, Wellness, History, AdminDashboard, FinancialsTab, BlocksTab.
+- **Fixed**: Removed redundant `animate-content-enter` / `animate-content-enter-delay-*` classes from inner wrappers inside `TabTransition` on BookGolf, Wellness, History, and AdminDashboard pages. These caused a second competing animation on top of the tab transition.
 - **Fixed**: BookGolf tab switch no longer sets `selectedDateObj` to a new object reference when the selected date hasn't changed. Previously, switching tabs always reset the date state (even to the same value), triggering unnecessary re-renders and a brief availability section flash. Now uses functional state update to preserve object identity when the date is unchanged.
 - **Improved**: Wellness ClassesView loading state now renders 4 `WellnessCardSkeleton` components instead of a full-page `PageLoadingSpinner`. This provides a content-shaped placeholder that matches the final layout, eliminating the jarring pop-in when data loads.
-- Files changed: `src/pages/Member/BookGolf/index.tsx`, `src/pages/Member/BookGolf/useBookGolf.ts`, `src/pages/Member/Wellness.tsx`
+- Files changed: `src/components/motion/TabTransition.tsx`, `src/pages/Member/BookGolf/index.tsx`, `src/pages/Member/BookGolf/useBookGolf.ts`, `src/pages/Member/Wellness.tsx`, `src/pages/Member/History.tsx`, `src/pages/Admin/AdminDashboard.tsx`
 
 ## [8.94.2] - 2026-03-20
 
