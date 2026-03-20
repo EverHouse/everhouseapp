@@ -4,6 +4,7 @@ import { MemberSearchInput, SelectedMember } from '../../shared/MemberSearchInpu
 import { useToast } from '../../Toast';
 import { postWithCredentials } from '../../../hooks/queries/useFetch';
 import Icon from '../../icons/Icon';
+import { useTierNames } from '../../../hooks/useTierNames';
 
 interface StaffDirectAddModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
   onSuccess
 }) => {
   const { showToast } = useToast();
+  const { tiers: availableTiers } = useTierNames();
   const [mode, setMode] = useState<'member' | 'guest'>('member');
   const [selectedMember, setSelectedMember] = useState<SelectedMember | null>(null);
   const [guestName, setGuestName] = useState('');
@@ -249,10 +251,9 @@ export const StaffDirectAddModal: React.FC<StaffDirectAddModalProps> = ({
                   className="w-full px-4 py-2 border border-primary/20 dark:border-white/20 rounded-xl bg-white dark:bg-black/20 text-primary dark:text-white"
                 >
                   <option value="">Use member's actual tier</option>
-                  <option value="Platinum">Platinum</option>
-                  <option value="Gold">Gold</option>
-                  <option value="Silver">Silver</option>
-                  <option value="Social">Social</option>
+                  {availableTiers.map(t => (
+                    <option key={t} value={t}>{t}</option>
+                  ))}
                 </select>
                 <p className="text-xs text-primary/50 dark:text-white/50 mt-1">
                   This will be logged for audit purposes

@@ -1,9 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { TIER_NAMES } from '../../../../shared/constants/tiers';
 import { fetchWithCredentials, postWithCredentials, putWithCredentials } from '../../../hooks/queries/useFetch';
 import { copyToClipboard } from '../../../lib/copyToClipboard';
 import { useToast } from '../../Toast';
+import { useTierNames } from '../../../hooks/useTierNames';
 import type { BillingInfo, OutstandingData, MigrationEligibility, CouponOption } from './types';
 
 export const memberBillingKeys = {
@@ -24,9 +24,10 @@ export function useMemberBilling(
   const { showToast } = useToast();
   const queryClient = useQueryClient();
 
+  const { tiers } = useTierNames();
   const [isEditingTier, setIsEditingTier] = useState(false);
   const [manualTier, setManualTier] = useState('');
-  const VALID_TIERS = [...TIER_NAMES];
+  const VALID_TIERS = [...tiers];
 
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);

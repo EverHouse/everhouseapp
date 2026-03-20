@@ -10,7 +10,7 @@ import { useScrollLock } from '../hooks/useScrollLock';
 import type { MemberProfile } from '../types/data';
 import { copyToClipboard } from '../lib/copyToClipboard';
 import MemberSearchInput, { SelectedMember } from './shared/MemberSearchInput';
-import { TIER_NAMES } from '../../shared/constants/tiers';
+import { useTierNames } from '../hooks/useTierNames';
 import IdScannerModal from './staff-command-center/modals/IdScannerModal';
 import { formatDatePacific } from './memberProfile/memberProfileTypes';
 import Icon from './icons/Icon';
@@ -106,6 +106,7 @@ const CopyButton: React.FC<{ value: string; isDark: boolean; size?: 'sm' | 'xs' 
 };
 
 const MemberProfileDrawer: React.FC<MemberProfileDrawerProps> = ({ isOpen, member, isAdmin, onClose, onViewAs, onMemberDeleted, onMemberUpdated, visitorMode = false }) => {
+  const { tiers: TIER_NAMES } = useTierNames();
   const { effectiveTheme } = useTheme();
   const { setDrawerOpen } = useBottomNav();
   const isDark = effectiveTheme === 'dark';

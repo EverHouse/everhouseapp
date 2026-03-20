@@ -1,9 +1,7 @@
-export const TIER_NAMES = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
-export type TierName = typeof TIER_NAMES[number];
+export type TierName = string;
 
-export const DEFAULT_TIER: TierName = 'Social';
-
-export const TIER_HIERARCHY: Record<TierName, number> = {
+const DEFAULT_TIER_NAMES = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
+const DEFAULT_TIER_HIERARCHY: Record<string, number> = {
   'Social': 1,
   'Core': 2,
   'Premium': 3,
@@ -11,41 +9,63 @@ export const TIER_HIERARCHY: Record<TierName, number> = {
   'VIP': 5,
 };
 
-export function normalizeTierName(tierString: string | null | undefined): TierName | null {
+let _tierNames: string[] = [...DEFAULT_TIER_NAMES];
+let _tierHierarchy: Record<string, number> = { ...DEFAULT_TIER_HIERARCHY };
+
+export const TIER_NAMES: string[] = _tierNames;
+
+export const DEFAULT_TIER: string = 'Social';
+
+export const TIER_HIERARCHY: Record<string, number> = _tierHierarchy;
+
+export function setTierData(names: string[], hierarchy: Record<string, number>): void {
+  _tierNames.length = 0;
+  _tierNames.push(...names);
+  for (const key of Object.keys(_tierHierarchy)) {
+    delete _tierHierarchy[key];
+  }
+  Object.assign(_tierHierarchy, hierarchy);
+}
+
+export function normalizeTierName(tierString: string | null | undefined): string | null {
   if (!tierString || typeof tierString !== 'string') {
     return null;
   }
 
-  const normalized = tierString.trim().toLowerCase();
-  
+  const normalized = tierString.trim();
   if (normalized.length === 0) {
     return null;
   }
 
-  if (normalized.includes('vip')) {
-    return 'VIP';
-  }
-  if (normalized.includes('corporate')) {
-    return 'Corporate';
-  }
-  if (normalized.includes('premium')) {
-    return 'Premium';
-  }
-  if (normalized.includes('core')) {
-    return 'Core';
-  }
-  if (normalized.includes('social')) {
-    return 'Social';
+  for (const name of _tierNames) {
+    if (name.toLowerCase() === normalized.toLowerCase()) {
+      return name;
+    }
   }
 
-  console.warn(`[normalizeTierName] Unrecognized tier "${tierString}", returning null. If this is a new tier, add it to shared/constants/tiers.ts`);
+  const lowered = normalized.toLowerCase();
+  const reversedNames = [..._tierNames].reverse();
+  for (const name of reversedNames) {
+    if (lowered.includes(name.toLowerCase())) {
+      return name;
+    }
+  }
+
   return null;
 }
 
-export function compareTiers(tier1: TierName, tier2: TierName): number {
-  return TIER_HIERARCHY[tier1] - TIER_HIERARCHY[tier2];
+export function compareTiers(tier1: string, tier2: string): number {
+  return (_tierHierarchy[tier1] ?? 0) - (_tierHierarchy[tier2] ?? 0);
 }
 
-export function isTierAtLeast(userTier: TierName, requiredTier: TierName): boolean {
-  return TIER_HIERARCHY[userTier] >= TIER_HIERARCHY[requiredTier];
+export function isTierAtLeast(userTier: string, requiredTier: string): boolean {
+  return (_tierHierarchy[userTier] ?? 0) >= (_tierHierarchy[requiredTier] ?? 0);
+}
+
+export function isValidTierName(tier: string): boolean {
+  return _tierNames.some(t => t.toLowerCase() === tier.toLowerCase());
+}
+
+export function getValidTierNames(): readonly string[] {
+  return _tierNames;
 }

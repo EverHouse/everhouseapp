@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { TIER_NAMES } from '../constants/tiers';
 
 export const profileUpdateSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100).trim(),
@@ -16,23 +15,14 @@ export const smsPreferencesSchema = z.object({
 export const tierChangeSchema = z.object({
   tier: z.string().nullable().optional(),
   immediate: z.boolean().optional(),
-}).refine(
-  (data) => {
-    if (data.tier === null || data.tier === undefined || data.tier === '') return true;
-    return (TIER_NAMES as readonly string[]).includes(data.tier);
-  },
-  { message: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')} or empty to clear`, path: ['tier'] }
-);
+});
 
 export const createMemberSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100).trim(),
   lastName: z.string().min(1, 'Last name is required').max(100).trim(),
   email: z.string().email('Valid email is required').transform(val => val.trim().toLowerCase()),
   phone: z.string().max(30).optional(),
-  tier: z.string().refine(
-    (val) => (TIER_NAMES as readonly string[]).includes(val),
-    { message: `Invalid tier. Must be one of: ${TIER_NAMES.join(', ')}` }
-  ),
+  tier: z.string().min(1, 'Tier is required'),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Start date must be in YYYY-MM-DD format').optional(),
   discountReason: z.string().max(500).optional(),
 });

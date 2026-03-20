@@ -1,4 +1,5 @@
 import { getSettingValue } from '../settingsHelper';
+import { CANONICAL_TIER_NAMES } from '../../utils/tierUtils';
 
 export type ContactMembershipStatus = 'Active' | 'trialing' | 'past_due' | 'Pending' | 'Declined' | 'Suspended' | 'Expired' | 'Froze' | 'Terminated' | 'Non-Member';
 
@@ -44,31 +45,45 @@ export const DB_BILLING_PROVIDER_TO_HUBSPOT: Record<string, string> = {
   'family_addon': 'stripe',
 };
 
-export const DB_TIER_TO_HUBSPOT: Record<string, string> = {
-  'core': 'Core Membership',
-  'core membership': 'Core Membership',
-  'core-founding': 'Core Membership Founding Members',
-  'core_founding': 'Core Membership Founding Members',
-  'core membership founding members': 'Core Membership Founding Members',
-  'premium': 'Premium Membership',
-  'premium membership': 'Premium Membership',
-  'premium-founding': 'Premium Membership Founding Members',
-  'premium_founding': 'Premium Membership Founding Members',
-  'premium membership founding members': 'Premium Membership Founding Members',
-  'social': 'Social Membership',
-  'social membership': 'Social Membership',
-  'social-founding': 'Social Membership Founding Members',
-  'social_founding': 'Social Membership Founding Members',
-  'social membership founding members': 'Social Membership Founding Members',
-  'vip': 'VIP Membership',
-  'vip membership': 'VIP Membership',
-  'corporate': 'Corporate Membership',
-  'corporate membership': 'Corporate Membership',
-  'group-lessons': 'Group Lessons Membership',
-  'group_lessons': 'Group Lessons Membership',
-  'group lessons': 'Group Lessons Membership',
-  'group lessons membership': 'Group Lessons Membership',
-};
+function buildDbTierToHubSpot(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const [slug, name] of Object.entries(CANONICAL_TIER_NAMES)) {
+    const membership = `${name} Membership`;
+    map[slug] = membership;
+    map[slug.replace(/-/g, '_')] = membership;
+    map[slug.replace(/-/g, ' ')] = membership;
+    map[name.toLowerCase()] = membership;
+    map[`${name.toLowerCase()} membership`] = membership;
+
+    map[`${slug}-founding`] = `${membership} Founding Members`;
+    map[`${slug}_founding`] = `${membership} Founding Members`;
+    map[`${name.toLowerCase()} membership founding members`] = `${membership} Founding Members`;
+  }
+  return map;
+}
+
+export function getDbTierToHubSpot(): Record<string, string> {
+  return buildDbTierToHubSpot();
+}
+
+export const DB_TIER_TO_HUBSPOT = new Proxy({} as Record<string, string>, {
+  get(_target, prop: string) {
+    return buildDbTierToHubSpot()[prop];
+  },
+  has(_target, prop: string) {
+    return prop in buildDbTierToHubSpot();
+  },
+  ownKeys() {
+    return Object.keys(buildDbTierToHubSpot());
+  },
+  getOwnPropertyDescriptor(_target, prop: string) {
+    const map = buildDbTierToHubSpot();
+    if (prop in map) {
+      return { value: map[prop], writable: true, enumerable: true, configurable: true };
+    }
+    return undefined;
+  },
+});
 
 export const INACTIVE_STATUSES = ['pending', 'declined', 'suspended', 'expired', 'froze', 'frozen'];
 export const CHURNED_STATUSES = ['terminated', 'cancelled', 'non-member'];
@@ -83,26 +98,20 @@ export async function getDbStatusToHubSpotMapping(): Promise<Record<string, stri
 }
 
 export async function getTierToHubSpotMapping(): Promise<Record<string, string>> {
-  const baseTiers: Record<string, string> = {
-    'core': 'Core Membership',
-    'core-founding': 'Core Membership Founding Members',
-    'premium': 'Premium Membership',
-    'premium-founding': 'Premium Membership Founding Members',
-    'social': 'Social Membership',
-    'social-founding': 'Social Membership Founding Members',
-    'vip': 'VIP Membership',
-    'corporate': 'Corporate Membership',
-    'group-lessons': 'Group Lessons Membership',
-  };
 
   const result: Record<string, string> = {};
-  for (const [slug, defaultLabel] of Object.entries(baseTiers)) {
+  for (const [slug, name] of Object.entries(CANONICAL_TIER_NAMES)) {
+    const defaultLabel = `${name} Membership`;
     const label = await getSettingValue(`hubspot.tier.${slug}`, defaultLabel);
     result[slug] = label;
     result[slug.replace(/-/g, '_')] = label;
     result[slug.replace(/-/g, ' ')] = label;
     const longName = `${slug.replace(/-/g, ' ')} membership`;
     if (longName !== slug) result[longName] = label;
+
+    const foundingLabel = await getSettingValue(`hubspot.tier.${slug}-founding`, `${defaultLabel} Founding Members`);
+    result[`${slug}-founding`] = foundingLabel;
+    result[`${slug}_founding`] = foundingLabel;
   }
   return result;
 }

@@ -481,8 +481,18 @@ export async function checkBillingProviderHybridState(): Promise<IntegrityCheckR
 export async function checkBillingOrphans(): Promise<IntegrityCheckResult> {
   const issues: IntegrityIssue[] = [];
 
-  const PAID_TIERS = ['Core', 'Premium', 'VIP', 'Corporate'];
-  const tierConditions = PAID_TIERS.map(t => `LOWER(tier) = '${t.toLowerCase()}'`).join(' OR ');
+  const paidTierResult = await db.execute(sql`
+    SELECT name FROM membership_tiers
+    WHERE is_active = true AND product_type = 'subscription'
+      AND price_cents > 0
+  `);
+  const PAID_TIERS = paidTierResult.rows.map((r: Record<string, unknown>) => r.name as string);
+  
+  if (PAID_TIERS.length === 0) {
+    return { name: 'Billing Orphans', status: 'pass' as const, issues: [], summary: 'No paid tiers configured' };
+  }
+  
+  const paidTierLower = PAID_TIERS.map(t => t.toLowerCase());
 
   const orphanResult = await db.execute(sql`
     SELECT id, email, first_name, last_name, tier, membership_status,
@@ -491,7 +501,7 @@ export async function checkBillingOrphans(): Promise<IntegrityCheckResult> {
     WHERE role = 'member'
       AND archived_at IS NULL
       AND membership_status = 'active'
-      AND (${sql.raw(tierConditions)})
+      AND LOWER(tier) = ANY(${paidTierLower})
       AND (stripe_subscription_id IS NULL OR stripe_subscription_id = '')
       AND (billing_provider IS NULL OR billing_provider NOT IN ('mindbody', 'comped', 'manual', 'family_addon'))
     ORDER BY

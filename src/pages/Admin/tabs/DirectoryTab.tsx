@@ -18,10 +18,11 @@ import FormerMembersList from './directory/FormerMembersList';
 import VisitorsList from './directory/VisitorsList';
 import TeamList from './directory/TeamList';
 import type { MemberTab, Visitor, TeamMember } from './directory/directoryTypes';
-import { ASSIGNABLE_TIERS } from './directory/directoryTypes';
+import { useTierNames } from '../../../hooks/useTierNames';
 import Icon from '../../../components/icons/Icon';
 
 const DirectoryTab: React.FC = () => {
+    const { tiers: assignableTiers } = useTierNames();
     const { setPageReady } = usePageReady();
     const { setViewAsUser, actualUser } = useAuthData();
     const { members, formerMembers, fetchFormerMembers, refreshMembers } = useMemberData();
@@ -370,7 +371,7 @@ const DirectoryTab: React.FC = () => {
                         </p>
 
                         <div className="space-y-2 mb-4">
-                            {ASSIGNABLE_TIERS.map(tier => {
+                            {assignableTiers.map(tier => {
                                 const colors = getTierColor(tier);
                                 const isSelected = selectedTierToAssign === tier;
                                 return (

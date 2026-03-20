@@ -6,10 +6,10 @@ import {
     type BillingFilter,
     type SortField,
     type SortDirection,
-    TIER_OPTIONS,
     BILLING_OPTIONS,
     SORT_OPTIONS,
 } from './directoryTypes';
+import { useTierNames } from '../../../../hooks/useTierNames';
 import { MEMBERSHIP_STATUS } from '../../../../../shared/constants/statuses';
 import Icon from '../../../../components/icons/Icon';
 
@@ -83,6 +83,7 @@ const DirectoryFilters: React.FC<DirectoryFiltersProps> = ({
     visitorsLength,
     visitorsTotal,
 }) => {
+    const { tiers } = useTierNames();
     return (
         <div className="mb-6 space-y-3 animate-content-enter-delay-1 sticky top-0 z-10 bg-transparent pt-2 pb-3">
             {memberTab !== 'visitors' && memberTab !== 'team' && (
@@ -168,7 +169,7 @@ const DirectoryFilters: React.FC<DirectoryFiltersProps> = ({
                             <div className="space-y-1.5">
                                 <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase">{memberTab === 'former' ? 'Last Tier' : 'Tier'}</span>
                                 <div className="flex flex-wrap gap-1.5">
-                                    {TIER_OPTIONS.map(tier => {
+                                    {(['All', ...tiers] as string[]).map(tier => {
                                         const isSelected = tierFilter === tier;
                                         const colors = tier !== 'All' ? getTierColor(tier) : { bg: '', text: '', border: '' };
                                         return (

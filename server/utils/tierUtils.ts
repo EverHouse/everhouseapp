@@ -1,9 +1,7 @@
 import { logger } from '../core/logger';
 
-export const TIER_SLUGS = ['social', 'core', 'premium', 'corporate', 'vip', 'staff', 'group-lessons'] as const;
-export type TierSlug = typeof TIER_SLUGS[number];
-
-export const CANONICAL_TIER_NAMES: Record<TierSlug, string> = {
+const DEFAULT_TIER_SLUGS = ['social', 'core', 'premium', 'corporate', 'vip', 'staff', 'group-lessons'];
+const DEFAULT_CANONICAL_NAMES: Record<string, string> = {
   social: 'Social',
   core: 'Core',
   premium: 'Premium',
@@ -12,8 +10,7 @@ export const CANONICAL_TIER_NAMES: Record<TierSlug, string> = {
   staff: 'Staff',
   'group-lessons': 'Group Lessons',
 };
-
-const FUZZY_TIER_PATTERNS: { pattern: string; slug: TierSlug }[] = [
+const DEFAULT_FUZZY_PATTERNS: { pattern: string; slug: string }[] = [
   { pattern: 'vip', slug: 'vip' },
   { pattern: 'premium', slug: 'premium' },
   { pattern: 'corporate', slug: 'corporate' },
@@ -24,7 +21,51 @@ const FUZZY_TIER_PATTERNS: { pattern: string; slug: TierSlug }[] = [
   { pattern: 'group-lesson', slug: 'group-lessons' },
 ];
 
-export function normalizeTierSlug(rawName: string | null | undefined): TierSlug | null {
+let _tierSlugs: string[] = [...DEFAULT_TIER_SLUGS];
+let _canonicalTierNames: Record<string, string> = { ...DEFAULT_CANONICAL_NAMES };
+let _fuzzyTierPatterns: { pattern: string; slug: string }[] = [...DEFAULT_FUZZY_PATTERNS];
+
+export type TierSlug = string;
+
+export const TIER_SLUGS: string[] = _tierSlugs;
+export const CANONICAL_TIER_NAMES: Record<string, string> = _canonicalTierNames;
+
+export function setServerTierData(
+  slugs: string[],
+  slugToName: Record<string, string>,
+  fuzzyPatterns: { pattern: string; slug: string }[]
+): void {
+  const mergedSlugs = new Set([...slugs]);
+  for (const s of DEFAULT_TIER_SLUGS) {
+    mergedSlugs.add(s);
+  }
+  _tierSlugs.length = 0;
+  _tierSlugs.push(...mergedSlugs);
+
+  for (const key of Object.keys(_canonicalTierNames)) {
+    if (!(key in DEFAULT_CANONICAL_NAMES) && !(key in slugToName)) {
+      delete _canonicalTierNames[key];
+    }
+  }
+  Object.assign(_canonicalTierNames, DEFAULT_CANONICAL_NAMES, slugToName);
+
+  _fuzzyTierPatterns.length = 0;
+  const seenPatterns = new Set<string>();
+  for (const p of fuzzyPatterns) {
+    if (!seenPatterns.has(p.pattern)) {
+      _fuzzyTierPatterns.push(p);
+      seenPatterns.add(p.pattern);
+    }
+  }
+  for (const p of DEFAULT_FUZZY_PATTERNS) {
+    if (!seenPatterns.has(p.pattern)) {
+      _fuzzyTierPatterns.push(p);
+      seenPatterns.add(p.pattern);
+    }
+  }
+}
+
+export function normalizeTierSlug(rawName: string | null | undefined): string | null {
   if (!rawName || typeof rawName !== 'string') {
     logger.warn('[normalizeTierSlug] Empty or invalid tier name, returning null', { rawName });
     return null;
@@ -38,22 +79,19 @@ export function normalizeTierSlug(rawName: string | null | undefined): TierSlug 
 
   const lowered = trimmed.toLowerCase();
 
-  for (const slug of TIER_SLUGS) {
+  for (const slug of _tierSlugs) {
     if (lowered === slug) {
       return slug;
     }
   }
 
-  for (const canonicalName of Object.values(CANONICAL_TIER_NAMES)) {
+  for (const [slug, canonicalName] of Object.entries(_canonicalTierNames)) {
     if (lowered === canonicalName.toLowerCase()) {
-      const matchedSlug = (Object.entries(CANONICAL_TIER_NAMES).find(
-        ([, name]) => name.toLowerCase() === lowered
-      )?.[0] as TierSlug) || null;
-      return matchedSlug;
+      return slug;
     }
   }
 
-  for (const { pattern, slug } of FUZZY_TIER_PATTERNS) {
+  for (const { pattern, slug } of _fuzzyTierPatterns) {
     if (lowered.includes(pattern)) {
       logger.warn('[normalizeTierSlug] Fuzzy match used for tier normalization', {
         rawName,
@@ -64,13 +102,13 @@ export function normalizeTierSlug(rawName: string | null | undefined): TierSlug 
     }
   }
 
-  logger.error('[normalizeTierSlug] No tier match found, returning null. If this is a new tier, add it to TIER_SLUGS in server/utils/tierUtils.ts AND TIER_NAMES in shared/constants/tiers.ts', { rawName });
+  logger.error('[normalizeTierSlug] No tier match found, returning null', { rawName });
   return null;
 }
 
 export function normalizeTierName(rawName: string | null | undefined): string | null {
   const slug = normalizeTierSlug(rawName);
-  return slug ? CANONICAL_TIER_NAMES[slug] : null;
+  return slug ? (_canonicalTierNames[slug] ?? null) : null;
 }
 
 export function isSocialTier(tierName: string | null | undefined): boolean {
@@ -81,35 +119,23 @@ export function isStaffTier(tierName: string | null | undefined): boolean {
   return normalizeTierSlug(tierName) === 'staff';
 }
 
-const VALID_HUBSPOT_TIERS = [
-  'Core Membership',
-  'Premium Membership',
-  'Social Membership',
-  'VIP Membership',
-  'Corporate Membership',
-  'Group Lessons Membership',
-];
-
-function tryNormalizeTierSlug(rawName: string): TierSlug | null {
+function tryNormalizeTierSlug(rawName: string): string | null {
   const trimmed = rawName.trim();
   if (trimmed.length === 0) return null;
 
   const lowered = trimmed.toLowerCase();
 
-  for (const slug of TIER_SLUGS) {
+  for (const slug of _tierSlugs) {
     if (lowered === slug) return slug;
   }
 
-  for (const canonicalName of Object.values(CANONICAL_TIER_NAMES)) {
+  for (const [slug, canonicalName] of Object.entries(_canonicalTierNames)) {
     if (lowered === canonicalName.toLowerCase()) {
-      const matchedSlug = (Object.entries(CANONICAL_TIER_NAMES).find(
-        ([, name]) => name.toLowerCase() === lowered
-      )?.[0] as TierSlug) || null;
-      return matchedSlug;
+      return slug;
     }
   }
 
-  for (const { pattern, slug } of FUZZY_TIER_PATTERNS) {
+  for (const { pattern, slug } of _fuzzyTierPatterns) {
     if (lowered.includes(pattern)) {
       return slug;
     }
@@ -129,14 +155,9 @@ export function denormalizeTierForHubSpot(rawName: string | null | undefined): s
     return null;
   }
   
-  const baseName = CANONICAL_TIER_NAMES[slug];
-  const hubspotTier = `${baseName} Membership`;
-  
-  if (VALID_HUBSPOT_TIERS.includes(hubspotTier)) {
-    return hubspotTier;
-  }
-  
-  return null;
+  const baseName = _canonicalTierNames[slug];
+  if (!baseName) return null;
+  return `${baseName} Membership`;
 }
 
 export async function denormalizeTierForHubSpotAsync(rawName: string | null | undefined): Promise<string | null> {
@@ -151,7 +172,7 @@ export async function denormalizeTierForHubSpotAsync(rawName: string | null | un
   }
 
   const { getSettingValue } = await import('../core/settingsHelper');
-  const baseName = CANONICAL_TIER_NAMES[slug];
+  const baseName = _canonicalTierNames[slug] ?? slug;
   const defaultTier = `${baseName} Membership`;
   return getSettingValue(`hubspot.tier.${slug}`, defaultTier);
 }

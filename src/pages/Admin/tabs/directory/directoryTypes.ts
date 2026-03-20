@@ -10,8 +10,8 @@ export type VisitorSortField = 'name' | 'email' | 'type' | 'source' | 'lastActiv
 
 export type StaffRole = 'staff' | 'admin' | 'golf_instructor';
 
-export const TIER_OPTIONS = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
-export const ASSIGNABLE_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
+export const TIER_OPTIONS_FALLBACK = ['All', 'Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
+export const ASSIGNABLE_TIERS_FALLBACK = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'] as const;
 export const BILLING_OPTIONS = ['All', 'Individual', 'Group', 'Stripe', 'Mindbody', 'Family Add-on', 'Comped'] as const;
 
 export const SORT_OPTIONS: { value: SortField; label: string }[] = [

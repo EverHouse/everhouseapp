@@ -6,7 +6,6 @@ import { users, membershipTiers } from '../../../shared/schema';
 import { isProduction, pool, safeRelease } from '../../core/db';
 import { isStaffOrAdmin, isAdmin } from '../../core/middleware';
 import { getSessionUser } from '../../types/session';
-import { TIER_NAMES } from '../../../shared/constants/tiers';
 import { getTierRank } from './helpers';
 import { createMemberLocally, getAllDiscountRules, queueTierSync, syncTierToHubSpot } from '../../core/hubspot';
 import { retryableHubSpotRequest } from '../../core/hubspot/request';
@@ -22,6 +21,7 @@ import { getErrorMessage } from '../../utils/errorUtils';
 import { invalidateCache } from '../../core/queryCache';
 import { validateBody } from '../../middleware/validate';
 import { tierChangeSchema, createMemberSchema } from '../../../shared/validators/members';
+import { isValidTierName, getValidTierNames } from '../../../shared/constants/tiers';
 import { sendPassUpdateForMemberByEmail } from '../../walletPass/apnPushService';
 import { voidBookingPass } from '../../walletPass/bookingPassService';
 
@@ -34,6 +34,10 @@ router.patch('/api/members/:email/tier', isStaffOrAdmin, validateBody(tierChange
     const sessionUser = getSessionUser(req);
     
     const normalizedTier = tier === '' || tier === null || tier === undefined ? null : tier;
+
+    if (normalizedTier !== null && !isValidTierName(normalizedTier)) {
+      return res.status(400).json({ error: `Invalid tier "${normalizedTier}". Valid tiers: ${getValidTierNames().join(', ')}` });
+    }
     
     const normalizedEmail = decodeURIComponent(email as string).trim().toLowerCase();
     
@@ -1075,7 +1079,7 @@ router.get('/api/members/add-options', isStaffOrAdmin, async (req, res) => {
     `);
     
     res.json({
-      tiers: TIER_NAMES,
+      tiers: tiersResult.rows.map((t: Record<string, unknown>) => t.name as string),
       tiersWithIds: tiersResult.rows.map((t: Record<string, unknown>) => ({
         id: t.id,
         name: t.name,
@@ -1106,6 +1110,10 @@ router.post('/api/members', isStaffOrAdmin, validateBody(createMemberSchema), as
     }
     
     const { firstName, lastName, email, phone, tier, startDate, discountReason } = req.body;
+
+    if (!isValidTierName(tier)) {
+      return res.status(400).json({ error: `Invalid tier "${tier}". Valid tiers: ${getValidTierNames().join(', ')}` });
+    }
     
     const memberInput = {
       firstName: firstName.trim(),
@@ -1169,13 +1177,11 @@ router.post('/api/members/admin/bulk-tier-update', isStaffOrAdmin, async (req, r
       return normalizeTierNameUtil(csvTier);
     }
     
-    const tierIdMap: Record<string, number> = {
-      'Social': 1,
-      'Core': 2,
-      'Premium': 3,
-      'Corporate': 4,
-      'VIP': 5
-    };
+    const tierIdResult = await db.execute(sql`SELECT id, name FROM membership_tiers WHERE is_active = true`);
+    const tierIdMap: Record<string, number> = {};
+    for (const row of tierIdResult.rows as { id: number; name: string }[]) {
+      tierIdMap[row.name] = row.id;
+    }
     
     // Validation and data preparation phase (fast)
     const results: {

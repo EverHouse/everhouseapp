@@ -406,31 +406,47 @@ export async function ensureDatabaseConstraints() {
         DECLARE
           raw_tier TEXT;
           lowered TEXT;
-          normalized TEXT;
+          matched_name TEXT;
         BEGIN
           raw_tier := NEW.tier;
           IF raw_tier IS NULL THEN
             RETURN NEW;
           END IF;
-          IF raw_tier IN ('Social', 'Core', 'Premium', 'Corporate', 'VIP', 'Staff', 'Group Lessons') THEN
+
+          SELECT name INTO matched_name
+          FROM public.membership_tiers
+          WHERE name = raw_tier
+          LIMIT 1;
+
+          IF matched_name IS NOT NULL THEN
             RETURN NEW;
           END IF;
+
           lowered := LOWER(TRIM(raw_tier));
-          normalized := CASE
-            WHEN lowered LIKE '%vip%' THEN 'VIP'
-            WHEN lowered LIKE '%premium%' THEN 'Premium'
-            WHEN lowered LIKE '%corporate%' THEN 'Corporate'
-            WHEN lowered LIKE '%core%' THEN 'Core'
-            WHEN lowered LIKE '%social%' THEN 'Social'
-            WHEN lowered LIKE '%staff%' THEN 'Staff'
-            WHEN lowered LIKE '%group lesson%' OR lowered LIKE '%group-lesson%' THEN 'Group Lessons'
-            ELSE NULL
-          END;
-          IF normalized IS NOT NULL THEN
-            NEW.tier := normalized;
+
+          SELECT name INTO matched_name
+          FROM public.membership_tiers
+          WHERE LOWER(name) = lowered OR LOWER(slug) = lowered
+          LIMIT 1;
+
+          IF matched_name IS NOT NULL THEN
+            NEW.tier := matched_name;
             RETURN NEW;
           END IF;
-          RETURN NEW;
+
+          SELECT name INTO matched_name
+          FROM public.membership_tiers
+          WHERE lowered LIKE '%' || LOWER(name) || '%'
+             OR lowered LIKE '%' || LOWER(slug) || '%'
+          ORDER BY sort_order ASC
+          LIMIT 1;
+
+          IF matched_name IS NOT NULL THEN
+            NEW.tier := matched_name;
+            RETURN NEW;
+          END IF;
+
+          RAISE EXCEPTION 'Invalid tier value: %. Must match a name in membership_tiers.', raw_tier;
         END;
         $$;
 
@@ -440,26 +456,18 @@ export async function ensureDatabaseConstraints() {
           FOR EACH ROW
           EXECUTE FUNCTION normalize_tier_value();
       `);
-      logger.info('[DB Init] Tier normalization trigger created/verified');
+      logger.info('[DB Init] Tier normalization trigger created/verified (dynamic, reads from membership_tiers)');
     } catch (err: unknown) {
       logger.warn(`[DB Init] Skipping tier normalization trigger: ${getErrorMessage(err)}`);
     }
 
     try {
       await db.execute(sql`
-        DO $$
-        BEGIN
-          IF NOT EXISTS (
-            SELECT 1 FROM pg_constraint WHERE conname = 'users_tier_check'
-          ) THEN
-            ALTER TABLE users ADD CONSTRAINT users_tier_check
-              CHECK (tier IS NULL OR tier IN ('Social', 'Core', 'Premium', 'Corporate', 'VIP', 'Staff', 'Group Lessons'));
-          END IF;
-        END $$;
+        ALTER TABLE users DROP CONSTRAINT IF EXISTS users_tier_check
       `);
-      logger.info('[DB Init] Tier CHECK constraint created/verified');
+      logger.info('[DB Init] Removed hardcoded tier CHECK constraint (tiers are now dynamic)');
     } catch (err: unknown) {
-      logger.warn(`[DB Init] Skipping tier CHECK constraint: ${getErrorMessage(err)}`);
+      logger.warn(`[DB Init] Skipping tier CHECK constraint removal: ${getErrorMessage(err)}`);
     }
 
     try {
@@ -2062,21 +2070,11 @@ export async function verifyIntegrityConstraints(): Promise<{ verified: boolean;
 
 export async function validateTierHierarchy(): Promise<void> {
   try {
-    const { TIER_NAMES } = await import('../shared/constants/tiers');
-    const codeSlugs = new Set(TIER_NAMES.map(t => t.toLowerCase()));
-    const dbTiers = await db.execute(sql`SELECT DISTINCT slug FROM membership_tiers WHERE is_active = true`);
-    const allDbSlugs = dbTiers.rows.map((r: Record<string, unknown>) => (r.slug as string)?.toLowerCase()).filter(Boolean);
-    const dbMembershipSlugs = new Set(allDbSlugs.filter(s => codeSlugs.has(s)));
-    
-    const inCodeNotDb = [...codeSlugs].filter(s => !dbMembershipSlugs.has(s));
-    
-    if (inCodeNotDb.length > 0) {
-      logger.warn(`[DB Init] Tier drift detected: Code constants have tiers not in DB: ${inCodeNotDb.join(', ')}`);
-    } else {
-      logger.info('[DB Init] Tier hierarchy validated — all code tier constants found in DB');
-    }
+    const { loadTierRegistry } = await import('./core/tierRegistry');
+    await loadTierRegistry();
+    logger.info('[DB Init] Tier registry loaded from database — tier constants are now dynamic');
   } catch (error: unknown) {
-    logger.error('[DB Init] Tier hierarchy validation failed:', { extra: { errorMessage: getErrorMessage(error) } });
+    logger.error('[DB Init] Tier registry load failed, using default tier constants:', { extra: { errorMessage: getErrorMessage(error) } });
   }
 }
 

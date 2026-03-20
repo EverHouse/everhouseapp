@@ -7,7 +7,7 @@ import { db } from '../../db';
 import { users } from '../../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 import { isStaffOrAdmin } from '../../core/middleware';
-import { normalizeTierName, TIER_NAMES } from '../../../shared/constants/tiers';
+import { normalizeTierName } from '../../../shared/constants/tiers';
 import { invalidateCache } from '../../core/queryCache';
 import { broadcastDirectoryUpdate } from '../../core/websocket';
 import { safeErrorDetail, getErrorMessage } from '../../utils/errorUtils';
@@ -214,13 +214,8 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
   const { tier } = req.body;
   const staffUser = (req as Request & { staffUser?: { name?: string } }).staffUser;
   
-  if (!tier || typeof tier !== 'string') {
+  if (!tier || typeof tier !== 'string' || tier.trim().length === 0) {
     return res.status(400).json({ error: 'Tier is required' });
-  }
-  
-  const validTiers = [...TIER_NAMES, 'Founding', 'Unlimited'] as string[];
-  if (!validTiers.includes(tier)) {
-    return res.status(400).json({ error: `Invalid tier. Must be one of: ${validTiers.join(', ')}` });
   }
     const hubspot = await getHubSpotClient();
     
@@ -243,25 +238,22 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
     const oldTier = localUser.tier || '(empty)';
     const hubspotContactId = localUser.hubspotId;
     
-    const tierMapping: Record<string, { tier_id: number | null; tier: string }> = {
-      'Social': { tier_id: 1, tier: 'Social' },
-      'Core': { tier_id: 2, tier: 'Core' },
-      'Premium': { tier_id: 3, tier: 'Premium' },
-      'Corporate': { tier_id: 4, tier: 'Corporate' },
-      'VIP': { tier_id: 5, tier: 'VIP' },
-      'Founding': { tier_id: 2, tier: 'Core' },
-      'Unlimited': { tier_id: 3, tier: 'Premium' },
-    };
-    
-    const tierData = tierMapping[tier];
-    if (!tierData) {
+    const tierLookup = await db.execute(sql`
+      SELECT id, name FROM membership_tiers
+      WHERE LOWER(name) = LOWER(${tier}) OR LOWER(slug) = LOWER(${tier})
+      LIMIT 1
+    `);
+
+    if (tierLookup.rows.length === 0) {
       return res.status(400).json({ error: `Invalid tier: ${tier}` });
     }
+
+    const matchedTier = tierLookup.rows[0] as { id: number; name: string };
     
     await db.update(users)
       .set({
-        tier: tierData.tier,
-        tierId: tierData.tier_id,
+        tier: matchedTier.name,
+        tierId: matchedTier.id,
       })
       .where(eq(users.id, localUser.id));
     
@@ -283,7 +275,7 @@ router.put('/api/hubspot/contacts/:id/tier', isStaffOrAdmin, async (req, res) =>
       }
     }
     
-    logger.info('[Tier Update] Contact (, ): -> by staff', { extra: { id, contactName, contactEmail, oldTier, tierDataTier: tierData.tier, staffUser: staffUser?.name || 'Unknown' } });
+    logger.info('[Tier Update] Contact (, ): -> by staff', { extra: { id, contactName, contactEmail, oldTier, newTier: matchedTier.name, staffUser: staffUser?.name || 'Unknown' } });
     
     invalidateAllContactsCacheTimestamp();
     

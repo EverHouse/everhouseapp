@@ -5,6 +5,7 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache } from '../core/tierService';
+import { invalidateTierRegistry } from '../core/tierRegistry';
 import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe, archiveAllStalePrices } from '../core/stripe/products';
 import { autoPushTierToStripe, autoPushFeeToStripe } from '../core/stripe/autoPush';
 import { updateOverageRate, updateGuestFee } from '../core/billing/pricingConfig';
@@ -241,6 +242,7 @@ router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema),
     if (updatedTier.name) invalidateTierCache(String(updatedTier.name));
     if (updatedTier.slug) invalidateTierCache(String(updatedTier.slug));
     invalidateQueryCache(TIERS_CACHE_KEY);
+    await invalidateTierRegistry();
     
     let synced = false;
     let syncError: string | undefined;
@@ -303,6 +305,7 @@ router.post('/api/membership-tiers', isAdmin, validateBody(createTierSchema), as
     if (newTier.name) invalidateTierCache(String(newTier.name));
     if (newTier.slug) invalidateTierCache(String(newTier.slug));
     invalidateQueryCache(TIERS_CACHE_KEY);
+    await invalidateTierRegistry();
     
     let synced = false;
     let syncError: string | undefined;

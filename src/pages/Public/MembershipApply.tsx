@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Footer } from '../../components/Footer';
 import { triggerHaptic } from '../../utils/haptics';
 import { formatPhoneNumber } from '../../utils/phoneFormat';
@@ -23,13 +24,25 @@ const getHubspotCookie = (): string | null => {
   return null;
 };
 
-const TIER_OPTIONS = [
-  'Social',
-  'Core',
-  'Premium',
-  'Corporate',
-  'Not sure yet'
-];
+const FALLBACK_TIER_OPTIONS = ['Social', 'Core', 'Premium', 'Corporate'];
+
+function useTierOptions(): string[] {
+  const { data } = useQuery({
+    queryKey: ['apply-tier-options'],
+    queryFn: async () => {
+      const res = await fetch('/api/membership-tiers?active=true');
+      if (!res.ok) return null;
+      return res.json() as Promise<Array<{ name: string; tier_type: string | null; show_on_membership_page: boolean }>>;
+    },
+    staleTime: 1000 * 60 * 30,
+  });
+
+  const tierNames = data
+    ? data.filter(t => t.show_on_membership_page).map(t => t.name)
+    : FALLBACK_TIER_OPTIONS;
+
+  return [...tierNames, 'Not sure yet'];
+}
 
 const INITIAL_FORM_DATA = {
   firstname: '',
@@ -42,6 +55,7 @@ const INITIAL_FORM_DATA = {
 };
 
 const MembershipApply: React.FC = () => {
+  const TIER_OPTIONS = useTierOptions();
   const { setPageReady } = usePageReady();
   const [step, setStep] = useState(1);
   const [success, setSuccess] = useState(false);
