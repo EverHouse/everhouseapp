@@ -71,7 +71,7 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
         <SlideUpDrawer 
             isOpen={isEditing && !!selectedTier} 
             onClose={() => { setIsEditing(false); setIsCreating(false); }} 
-            title={isCreating ? 'New Tier' : `Edit: ${selectedTier?.name || ''}`}
+            title={isCreating ? (isMembershipTier ? 'New Subscription' : 'New Product') : `Edit: ${selectedTier?.name || ''}`}
             maxHeight="full"
             stickyFooter={
                 <div className="flex gap-3 justify-end p-4">
@@ -265,46 +265,87 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                                 Unlink
                                             </button>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2 text-xs">
-                                            <div>
-                                                <span className="text-indigo-500 dark:text-indigo-400">Product:</span>
-                                                <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_product_id || '—'}</span>
+                                        <div className="space-y-1.5 text-xs">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="text-indigo-500 dark:text-indigo-400 flex-shrink-0">Product:</span>
+                                                <span className="text-indigo-700 dark:text-indigo-300 font-mono truncate">{selectedTier.stripe_product_id || '—'}</span>
+                                                {selectedTier.stripe_product_id && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => { navigator.clipboard.writeText(selectedTier.stripe_product_id || ''); showToast('Product ID copied', 'success'); }}
+                                                        className="flex-shrink-0 p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition-colors"
+                                                        title="Copy Product ID"
+                                                    >
+                                                        <Icon name="content_copy" className="text-xs text-indigo-500 dark:text-indigo-400" />
+                                                    </button>
+                                                )}
                                             </div>
-                                            <div>
-                                                <span className="text-indigo-500 dark:text-indigo-400">Price:</span>
-                                                <span className="ml-1 text-indigo-700 dark:text-indigo-300 font-mono">{selectedTier.stripe_price_id}</span>
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="text-indigo-500 dark:text-indigo-400 flex-shrink-0">Price:</span>
+                                                <span className="text-indigo-700 dark:text-indigo-300 font-mono truncate">{selectedTier.stripe_price_id}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { navigator.clipboard.writeText(selectedTier.stripe_price_id || ''); showToast('Price ID copied', 'success'); }}
+                                                    className="flex-shrink-0 p-0.5 rounded hover:bg-indigo-200 dark:hover:bg-indigo-800/40 transition-colors"
+                                                    title="Copy Price ID"
+                                                >
+                                                    <Icon name="content_copy" className="text-xs text-indigo-500 dark:text-indigo-400" />
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                 ) : (
-                                    <div>
-                                        <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Link to Stripe Price</label>
-                                        <select
-                                            className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
-                                            value=""
-                                            onChange={e => {
-                                                if (!selectedTier) return;
-                                                const priceId = e.target.value;
-                                                if (priceId) {
-                                                    const selectedPrice = stripePrices.find(p => p.id === priceId);
-                                                    if (selectedPrice) {
-                                                        setSelectedTier({
-                                                            ...selectedTier,
-                                                            stripe_price_id: priceId,
-                                                            stripe_product_id: selectedPrice.productId,
-                                                            price_cents: selectedPrice.amountCents
-                                                        });
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Link to Stripe Price</label>
+                                            <select
+                                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
+                                                value=""
+                                                onChange={e => {
+                                                    if (!selectedTier) return;
+                                                    const priceId = e.target.value;
+                                                    if (priceId) {
+                                                        const selectedPrice = stripePrices.find(p => p.id === priceId);
+                                                        if (selectedPrice) {
+                                                            setSelectedTier({
+                                                                ...selectedTier,
+                                                                stripe_price_id: priceId,
+                                                                stripe_product_id: selectedPrice.productId,
+                                                                price_cents: selectedPrice.amountCents
+                                                            });
+                                                        }
                                                     }
-                                                }
-                                            }}
-                                        >
-                                            <option value="">Select a Stripe price...</option>
-                                            {stripePrices.map(p => (
-                                                <option key={p.id} value={p.id}>
-                                                    {p.productName} — {p.displayString}
-                                                </option>
-                                            ))}
-                                        </select>
+                                                }}
+                                            >
+                                                <option value="">Select a Stripe price...</option>
+                                                {stripePrices.map(p => (
+                                                    <option key={p.id} value={p.id}>
+                                                        {p.productName} — {p.displayString} — {p.id}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] uppercase font-bold text-gray-500 dark:text-gray-400">Price (cents)</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-2.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast"
+                                                value={selectedTier?.price_cents ?? ''}
+                                                onChange={e => {
+                                                    if (!selectedTier) return;
+                                                    const val = e.target.value === '' ? null : parseInt(e.target.value, 10);
+                                                    setSelectedTier({ ...selectedTier, price_cents: val });
+                                                }}
+                                                placeholder="e.g., 5000 = $50.00"
+                                            />
+                                            {selectedTier?.price_cents != null && selectedTier.price_cents > 0 && (
+                                                <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                                                    = ${(selectedTier.price_cents / 100).toFixed(2)}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

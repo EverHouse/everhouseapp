@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.18",
+    date: "2026-03-20",
+    title: "Tier Editor UX: Vertical IDs, Copy Buttons, Price Input, Sheet Titles",
+    changes: [
+      "Improved: Stripe Product/Price IDs now display in a vertical layout instead of two columns — no more overflow on mobile",
+      "Added: Copy-to-clipboard button next to every Stripe Product ID and Price ID across the tier editor, fee cards, and pass cards",
+      "Added: Price (cents) input field in the tier editor when no Stripe price is linked — set prices directly in the app",
+      "Added: Stripe Price ID now shown in the 'Link to Stripe Price' dropdown items for easier identification",
+      "Fixed: New one-time product sheet now shows 'New Product' instead of 'New Tier'",
+      "Fixed: New subscription sheet now shows 'New Subscription' instead of 'New Tier'",
+    ]
+  },
+  {
     version: "8.94.17",
     date: "2026-03-20",
     title: "Stripe Sync Hardening: Loop Prevention + Source-of-Truth Safety",

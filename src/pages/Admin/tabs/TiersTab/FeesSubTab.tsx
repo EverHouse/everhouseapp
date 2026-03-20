@@ -139,9 +139,19 @@ const FeesSubTab: React.FC<FeesSubTabProps> = ({ tiers, openEdit, openCreate }) 
                                 </div>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">per guest per session</p>
                                 {guestFeeTier?.stripe_price_id && (
-                                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 font-mono truncate" title={guestFeeTier.stripe_price_id}>
-                                        {guestFeeTier.stripe_price_id}
-                                    </p>
+                                    <div className="flex items-center gap-1 mt-1 min-w-0">
+                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate" title={guestFeeTier.stripe_price_id}>
+                                            {guestFeeTier.stripe_price_id}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(guestFeeTier.stripe_price_id || ''); showToast('Price ID copied', 'success'); }}
+                                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+                                            title="Copy Price ID"
+                                        >
+                                            <Icon name="content_copy" className="text-[10px] text-gray-400" />
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                             <div className="p-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/20 shadow-sm">
@@ -162,9 +172,19 @@ const FeesSubTab: React.FC<FeesSubTabProps> = ({ tiers, openEdit, openCreate }) 
                                 </div>
                                 <p className="text-xs text-gray-400 dark:text-gray-500 mt-1.5">per {pricing.overageBlockMinutes} min block</p>
                                 {overageTier?.stripe_price_id && (
-                                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1 font-mono truncate" title={overageTier.stripe_price_id}>
-                                        {overageTier.stripe_price_id}
-                                    </p>
+                                    <div className="flex items-center gap-1 mt-1 min-w-0">
+                                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate" title={overageTier.stripe_price_id}>
+                                            {overageTier.stripe_price_id}
+                                        </p>
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(overageTier.stripe_price_id || ''); showToast('Price ID copied', 'success'); }}
+                                            className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+                                            title="Copy Price ID"
+                                        >
+                                            <Icon name="content_copy" className="text-[10px] text-gray-400" />
+                                        </button>
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -235,9 +255,19 @@ const FeesSubTab: React.FC<FeesSubTabProps> = ({ tiers, openEdit, openCreate }) 
                                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">{pass.description}</p>
                                         )}
                                         {pass.stripe_price_id && (
-                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1.5 font-mono truncate" title={pass.stripe_price_id}>
-                                                {pass.stripe_price_id}
-                                            </p>
+                                            <div className="flex items-center gap-1 mt-1.5 min-w-0">
+                                                <p className="text-[10px] text-gray-400 dark:text-gray-500 font-mono truncate" title={pass.stripe_price_id}>
+                                                    {pass.stripe_price_id}
+                                                </p>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(pass.stripe_price_id || ''); showToast('Price ID copied', 'success'); }}
+                                                    className="flex-shrink-0 p-0.5 rounded hover:bg-gray-200 dark:hover:bg-white/10 transition-colors"
+                                                    title="Copy Price ID"
+                                                >
+                                                    <Icon name="content_copy" className="text-[10px] text-gray-400" />
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     <button aria-label="Edit pass" className="text-gray-600 hover:text-primary dark:hover:text-white transition-colors">

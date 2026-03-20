@@ -2,6 +2,16 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.18] - 2026-03-20
+
+### Tier Editor UX: Vertical IDs, Copy Buttons, Price Input, Sheet Titles
+- **Improved**: Stripe Product/Price IDs in the "Linked to Stripe" card now render in a vertical (stacked) layout instead of a 2-column grid. IDs no longer overflow or get clipped on mobile.
+- **Added**: Copy-to-clipboard button (content_copy icon) next to every displayed Stripe Product ID and Price ID — in the tier editor linked card, dynamic fee cards (guest fee, overage rate), and one-time pass cards.
+- **Added**: "Price (cents)" number input in the tier editor when no Stripe price is linked, allowing admins to set the price directly in the app (auto-push creates the Stripe price on save). Shows a human-readable dollar conversion below.
+- **Added**: Stripe Price ID now shown in each dropdown item when linking to a Stripe price (format: `{product name} — {display string} — {price_id}`), making it easier to identify the correct price.
+- **Fixed**: Tier editor sheet title now reflects the type: "New Subscription" for subscription tiers, "New Product" for one-time products (was "New Tier" for both).
+- **Scope**: `src/pages/Admin/tabs/TiersTab/TierEditorDrawer.tsx`, `src/pages/Admin/tabs/TiersTab/FeesSubTab.tsx`.
+
 ## [8.94.17] - 2026-03-20
 
 ### Stripe Sync Hardening: Loop Prevention + Source-of-Truth Safety
