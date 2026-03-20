@@ -375,12 +375,16 @@ const Login: React.FC = () => {
   };
 
   if (sessionChecked && user) {
-    return <div className="min-h-screen" />;
+    return (
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] items-center justify-center">
+        <WalkingGolferSpinner size="md" variant="auto" />
+      </div>
+    );
   }
 
   if (otpSent) {
     return (
-      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
+      <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden animate-page-enter">
         <div className="flex-1 flex flex-col justify-center px-6 py-12">
           <div className="w-full max-w-sm mx-auto space-y-8">
             <div className="text-center">
@@ -464,7 +468,7 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden">
+    <div className="flex flex-col min-h-screen bg-bone dark:bg-[#141414] overflow-x-hidden animate-page-enter">
       <div className="flex-1 flex flex-col justify-center px-6 py-12">
         <div className="w-full max-w-sm mx-auto space-y-8">
             

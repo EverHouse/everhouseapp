@@ -10,6 +10,7 @@ import { AnimatedPage } from '../../../components/motion';
 import { useUndoAction } from '../../../hooks/useUndoAction';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import Icon from '../../../components/icons/Icon';
+import { useToast } from '../../../components/Toast';
 
 type StaffRole = 'staff' | 'admin' | 'golf_instructor';
 
@@ -81,7 +82,7 @@ const TeamTab: React.FC = () => {
   const [isViewingDetails, setIsViewingDetails] = useState(false);
   const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [searchQuery, setSearchQuery] = useState('');
   const [teamRef] = useAutoAnimate();
   const [isAddingPerson, setIsAddingPerson] = useState(false);
@@ -133,8 +134,7 @@ const TeamTab: React.FC = () => {
     onSuccess: () => {
       setIsEditing(false);
       setSelectedMember(null);
-      setSuccess('Team member updated');
-      setTimeout(() => setSuccess(null), 3000);
+      showToast('Team member updated', 'success');
     },
   });
 
@@ -156,8 +156,7 @@ const TeamTab: React.FC = () => {
     onSuccess: () => {
       setNewPerson({ firstName: '', lastName: '', email: '', phone: '', jobTitle: '', role: 'staff' });
       setIsAddingPerson(false);
-      setSuccess('Team member added');
-      setTimeout(() => setSuccess(null), 3000);
+      showToast('Team member added', 'success');
     },
     onError: (error: Error) => {
       setAddError(error.message || 'Failed to add team member');
@@ -219,8 +218,7 @@ const TeamTab: React.FC = () => {
       onExecute: async () => {
         await deleteWithCredentials(`/api/staff-users/${member.id}`);
         queryClient.invalidateQueries({ queryKey: ['staff-users'] });
-        setSuccess('Team member removed');
-        setTimeout(() => setSuccess(null), 3000);
+        showToast('Team member removed', 'success');
       },
       onUndo: () => {
         if (previousData) queryClient.setQueryData(['staff-users'], previousData);
@@ -353,12 +351,6 @@ const TeamTab: React.FC = () => {
             />
           </div>
         </div>
-
-        {success && (
-          <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm">
-            {success}
-          </div>
-        )}
 
         {(error || (fetchError instanceof Error && fetchError.message)) && (
           <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">

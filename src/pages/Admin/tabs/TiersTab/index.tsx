@@ -24,7 +24,7 @@ const TiersTab: React.FC = () => {
     }
 
     return (
-        <div className="animate-content-enter">
+        <div className="animate-page-enter">
             <div className="flex gap-1 p-1 bg-gray-100 dark:bg-black/30 rounded-xl mb-6 overflow-x-auto scrollbar-hide">
                 {SUB_TABS.map(t => (
                     <button
@@ -57,8 +57,6 @@ const TiersTab: React.FC = () => {
                     setIsEditing={tab.setIsEditing}
                     setIsCreating={tab.setIsCreating}
                     error={tab.error}
-                    successMessage={tab.successMessage}
-                    setSuccessMessage={tab.setSuccessMessage}
                     saveTierMutation={tab.saveTierMutation}
                     handleSave={tab.handleSave}
                     stripePrices={tab.stripePrices}

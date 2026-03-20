@@ -29,7 +29,6 @@ export function useTiersTab() {
     const [isCreating, setIsCreating] = useState(false);
     const [selectedTier, setSelectedTier] = useState<MembershipTier | null>(null);
     const [error, setError] = useState<string | null>(null);
-    const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [editingLabelId, setEditingLabelId] = useState<number | null>(null);
     const [newFeatureForm, setNewFeatureForm] = useState({ key: '', label: '', type: 'boolean' as 'boolean' | 'number' | 'text' });
     const debounceTimers = useRef<Record<string, NodeJS.Timeout>>({});
@@ -126,12 +125,9 @@ export function useTiersTab() {
             await queryClient.cancelQueries({ queryKey: ['membership-tiers'] });
         },
         onSuccess: () => {
-            setSuccessMessage(`Tier ${isCreating ? 'created' : 'updated'} successfully`);
-            setTimeout(() => {
-                setIsEditing(false);
-                setIsCreating(false);
-                setSuccessMessage(null);
-            }, 1000);
+            showToast(`Tier ${isCreating ? 'created' : 'updated'} successfully`, 'success');
+            setIsEditing(false);
+            setIsCreating(false);
         },
         onError: (err: Error) => {
             setError((err instanceof Error ? err.message : String(err)) || `Failed to ${isCreating ? 'create' : 'save'} tier`);
@@ -323,7 +319,6 @@ export function useTiersTab() {
         setIsCreating(true);
         setIsEditing(true);
         setError(null);
-        setSuccessMessage(null);
     };
 
     const openEdit = (tier: MembershipTier) => {
@@ -334,7 +329,6 @@ export function useTiersTab() {
         });
         setIsEditing(true);
         setError(null);
-        setSuccessMessage(null);
     };
 
     const handleSave = async () => {
@@ -380,8 +374,6 @@ export function useTiersTab() {
         setSelectedTier,
         error,
         setError,
-        successMessage,
-        setSuccessMessage,
         editingLabelId,
         setEditingLabelId,
         newFeatureForm,

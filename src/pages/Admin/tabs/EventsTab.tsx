@@ -10,12 +10,11 @@ import { WellnessAdminContent } from './events/WellnessAdminContent';
 import Icon from '../../../components/icons/Icon';
 
 const EventsTab: React.FC = () => {
-    const { showToast: _showToast } = useToast();
+    const { showToast } = useToast();
     const queryClient = useQueryClient();
     const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
     const activeSubTab: 'events' | 'wellness' = subtabParam === 'wellness' ? 'wellness' : 'events';
-    const [syncMessage, setSyncMessage] = useState<string | null>(null);
     
     const setActiveSubTab = (tab: 'events' | 'wellness') => {
         setSearchParams(prev => {
@@ -59,30 +58,18 @@ const EventsTab: React.FC = () => {
                 const wellness = calData?.wellness as Record<string, unknown> | undefined;
                 if (events?.synced) parts.push(`${events.synced} events`);
                 if (wellness?.synced) parts.push(`${wellness.synced} wellness`);
-                setSyncMessage(parts.length > 0 ? `Synced ${parts.join(', ')}` : 'Sync complete');
+                showToast(parts.length > 0 ? `Synced ${parts.join(', ')}` : 'Sync complete', 'success');
             } else {
-                setSyncMessage(`Sync failed for: ${errors.join(', ')}`);
+                showToast(`Sync failed for: ${errors.join(', ')}`, 'error');
             }
-            setTimeout(() => setSyncMessage(null), 5000);
         },
         onError: () => {
-            setSyncMessage('Network error - please try again');
-            setTimeout(() => setSyncMessage(null), 5000);
+            showToast('Network error - please try again', 'error');
         }
     });
     
     return (
             <div className="animate-page-enter backdrop-blur-sm">
-                {syncMessage && (
-                    <div className={`mb-4 px-4 py-2 rounded-lg text-sm font-medium ${
-                        syncMessage.startsWith('Error') || syncMessage.startsWith('Failed') || syncMessage.startsWith('Some syncs') || syncMessage.includes('failed')
-                            ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800' 
-                            : 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 border border-green-200 dark:border-green-800'
-                    }`}>
-                        {syncMessage}
-                    </div>
-                )}
-
                 <div className="flex gap-2 mb-4 animate-content-enter-delay-1">
                     <button
                         type="button"

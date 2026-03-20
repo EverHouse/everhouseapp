@@ -175,11 +175,6 @@ const DirectoryTab: React.FC = () => {
                             </button>
                         ))}
                     </div>
-                    {data.syncMessage && (
-                        <span className={`text-[10px] font-medium ${data.syncMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : data.syncMessage.type === 'warning' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>
-                            {data.syncMessage.text}
-                        </span>
-                    )}
                 </div>
                 <button
                     onClick={handleSync}

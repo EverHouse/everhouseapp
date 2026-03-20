@@ -168,7 +168,6 @@ export const EventsAdminContent: React.FC = () => {
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [eventToDelete, setEventToDelete] = useState<DBEvent | null>(null);
     const [eventCascadePreview, setEventCascadePreview] = useState<{ rsvps: number } | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
     
     const [needsReviewExpanded, setNeedsReviewExpanded] = useState(true);
     const [showPastEvents, setShowPastEvents] = useState(false);
@@ -290,9 +289,7 @@ export const EventsAdminContent: React.FC = () => {
                     return next;
                 });
             }
-            setSuccess('Event archived');
             showToast('Event archived successfully', 'success');
-            setTimeout(() => setSuccess(null), 3000);
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['admin-events'] });
@@ -305,9 +302,7 @@ export const EventsAdminContent: React.FC = () => {
                     return next;
                 });
             }
-            setError(getNetworkErrorMessage());
             showToast('Failed to archive event', 'error');
-            setTimeout(() => setError(null), 3000);
         }
     });
 
@@ -492,11 +487,6 @@ export const EventsAdminContent: React.FC = () => {
                 ))}
             </div>
 
-            {success && (
-                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm">
-                    {success}
-                </div>
-            )}
 
             {error && !isEditing && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">

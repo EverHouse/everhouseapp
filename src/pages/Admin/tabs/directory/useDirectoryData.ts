@@ -83,7 +83,6 @@ export function useDirectoryData({
 
     const [formerLoading, setFormerLoading] = useState(false);
     const [formerError, setFormerError] = useState(false);
-    const [syncMessage, setSyncMessage] = useState<{ type: 'success' | 'warning' | 'error'; text: string } | null>(null);
     const lastAppliedJobIdRef = useRef<string | null>(null);
     const [optimisticTiers, setOptimisticTiers] = useState<Record<string, string>>({});
     const [pendingTierUpdates, setPendingTierUpdates] = useState<Set<string>>(new Set());
@@ -209,15 +208,11 @@ export function useDirectoryData({
                 fetchFormerMembers().finally(() => setFormerLoading(false));
             }
             const msg = formatSyncResult(syncStatusData.result);
-            setSyncMessage(msg);
-            const timer = setTimeout(() => setSyncMessage(null), 5000);
-            return () => clearTimeout(timer);
+            showToast(msg.text, msg.type);
         }
         if (syncStatusData?.status === 'failed') {
             lastAppliedJobIdRef.current = jobId;
-            setSyncMessage({ type: 'error', text: syncStatusData.error || 'Failed to sync' });
-            const timer = setTimeout(() => setSyncMessage(null), 5000);
-            return () => clearTimeout(timer);
+            showToast(syncStatusData.error || 'Failed to sync', 'error');
         }
     }, [syncStatusData?.status, syncStatusData?.jobId, formatSyncResult, refreshMembers, memberTab, fetchFormerMembers, setFormerLoading, syncStatusData?.error, syncStatusData?.result]);
 
@@ -238,15 +233,13 @@ export function useDirectoryData({
                 }
                 if (result) {
                     const msg = formatSyncResult(result as DirectorySyncResult);
-                    setSyncMessage(msg);
-                    setTimeout(() => setSyncMessage(null), 5000);
+                    showToast(msg.text, msg.type);
                 }
             } else if (status === 'failed') {
                 if (wsJobId && lastAppliedJobIdRef.current === wsJobId) return;
                 if (wsJobId) lastAppliedJobIdRef.current = wsJobId;
 
-                setSyncMessage({ type: 'error', text: error || 'Failed to sync' });
-                setTimeout(() => setSyncMessage(null), 5000);
+                showToast(error || 'Failed to sync', 'error');
             }
         };
 
@@ -262,14 +255,12 @@ export function useDirectoryData({
         },
         onSuccess: (data) => {
             if (!data.started) {
-                setSyncMessage({ type: 'warning', text: data.message || 'Sync already in progress' });
-                setTimeout(() => setSyncMessage(null), 5000);
+                showToast(data.message || 'Sync already in progress', 'info');
             }
             queryClient.invalidateQueries({ queryKey: directoryKeys.syncStatus() });
         },
         onError: () => {
-            setSyncMessage({ type: 'error', text: 'Failed to start sync' });
-            setTimeout(() => setSyncMessage(null), 5000);
+            showToast('Failed to start sync', 'error');
         },
     });
 
@@ -406,7 +397,6 @@ export function useDirectoryData({
         visitorPurchases,
         purchasesLoading,
         syncMutation,
-        syncMessage,
         assignTierMutation,
         formerLoading,
         formerError,

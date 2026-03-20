@@ -6,6 +6,7 @@ import type { MembershipTier, TierFeature, StripePrice } from './tiersTypes';
 import { BOOLEAN_FIELDS } from './tiersTypes';
 import CompareTableSection from './CompareTableSection';
 import Icon from '../../../../components/icons/Icon';
+import { useToast } from '../../../../components/Toast';
 
 interface TierEditorDrawerProps {
     isEditing: boolean;
@@ -15,8 +16,6 @@ interface TierEditorDrawerProps {
     setIsEditing: (v: boolean) => void;
     setIsCreating: (v: boolean) => void;
     error: string | null;
-    successMessage: string | null;
-    setSuccessMessage: (v: string | null) => void;
     saveTierMutation: { isPending: boolean };
     handleSave: () => void;
     stripePrices: StripePrice[];
@@ -47,8 +46,6 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
     setIsEditing,
     setIsCreating,
     error,
-    successMessage,
-    setSuccessMessage,
     saveTierMutation,
     handleSave,
     stripePrices,
@@ -69,6 +66,7 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
     deleteFeature,
     queryClient,
 }) => {
+    const { showToast } = useToast();
     const isMembershipTier = selectedTier?.product_type !== 'one_time';
 
     return (
@@ -103,11 +101,6 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                     </div>
                 )}
 
-                {successMessage && (
-                    <div className="p-3 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 rounded-lg text-sm">
-                        {successMessage}
-                    </div>
-                )}
 
                 <div>
                     <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">{isMembershipTier ? 'MEMBERSHIP PAGE CARD' : 'PRODUCT DETAILS'}</h4>
@@ -268,8 +261,7 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                                         stripe_product_id: null,
                                                         price_cents: null
                                                     });
-                                                    setSuccessMessage('Stripe link removed. Save to confirm.');
-                                                    setTimeout(() => setSuccessMessage(null), 3000);
+                                                    showToast('Stripe link removed. Save to confirm.', 'success');
                                                 }}
                                                 className="ml-auto px-2 py-1 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                                             >

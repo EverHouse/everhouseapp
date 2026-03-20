@@ -2,6 +2,17 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.93.0] - 2026-03-20
+
+### Toast & Animation Consistency Pass
+- **Improved**: Admin notification messages (sync results, tier saves, event updates, wellness updates, discount changes) now use the standard toast instead of inline banners that auto-dismiss
+- **Improved**: Directory sync status messages now appear as toasts instead of a small inline label next to the Sync button
+- **Improved**: Tier editor Stripe unlink confirmation now uses the standard toast
+- **Improved**: All remaining public pages (Login, Day Pass, Private Hire, Privacy Policy, Terms of Service) and admin tabs (Tiers, Discounts, Announcements) now have smooth entry animations on load
+- **Fixed**: Login page no longer flashes a blank white screen while redirecting an already-authenticated user — now shows the branded loading spinner
+- **Fixed**: Landing page redirect screen now matches the site background color instead of showing a white flash
+- Files changed: `src/pages/Admin/tabs/TiersTab/TierEditorDrawer.tsx`, `src/pages/Admin/tabs/TiersTab/index.tsx`, `src/pages/Admin/tabs/DiscountsSubTab.tsx`, `src/pages/Admin/tabs/DirectoryTab.tsx`, `src/pages/Admin/tabs/directory/useDirectoryData.ts`, `src/components/admin/AnnouncementManager.tsx`, `src/pages/Public/Login.tsx`, `src/pages/Public/Landing.tsx`, `src/pages/Public/PrivateHire.tsx`, `src/pages/Public/BuyDayPass.tsx`, `src/pages/Public/DayPassSuccess.tsx`, `src/pages/Public/PrivacyPolicy.tsx`, `src/pages/Public/TermsOfService.tsx`
+
 ## [8.92.0] - 2026-03-20
 
 ### Animation & Interaction Polish

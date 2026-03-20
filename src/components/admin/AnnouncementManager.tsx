@@ -199,7 +199,7 @@ const AnnouncementManager: React.FC<AnnouncementManagerProps> = ({ triggerCreate
     const syncingTo = syncToSheetMutation.isPending;
 
     return (
-        <div className="animate-content-enter">
+        <div className="animate-page-enter">
             <SlideUpDrawer 
                 isOpen={isEditing} 
                 onClose={() => setIsEditing(false)} 

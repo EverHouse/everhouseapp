@@ -170,7 +170,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-12 animate-page-enter">
         <Icon name="progress_activity" className="animate-spin text-4xl text-primary/70" />
       </div>
     );
@@ -193,7 +193,7 @@ const DiscountsSubTab: React.FC<DiscountsSubTabProps> = ({ onCreateClick }) => {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-page-enter">
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-sm text-gray-500 dark:text-gray-400">

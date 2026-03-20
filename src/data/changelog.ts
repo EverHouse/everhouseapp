@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.93.0",
+    date: "2026-03-20",
+    title: "Toast & Animation Consistency Pass",
+    changes: [
+      "Improved: Admin notification messages (sync results, tier saves, event updates, wellness updates, discount changes) now use the standard toast instead of inline banners that auto-dismiss",
+      "Improved: Directory sync status messages now appear as toasts instead of a small inline label next to the Sync button",
+      "Improved: Tier editor Stripe unlink confirmation now uses the standard toast",
+      "Improved: All remaining public pages (Login, Day Pass, Private Hire, Privacy Policy, Terms of Service) and admin tabs (Tiers, Discounts, Announcements) now have smooth entry animations on load",
+      "Fixed: Login page no longer flashes a blank white screen while redirecting an already-authenticated user — now shows the branded loading spinner",
+      "Fixed: Landing page redirect screen now matches the site background color instead of showing a white flash",
+    ]
+  },
+  {
     version: "8.92.0",
     date: "2026-03-20",
     title: "Animation & Interaction Polish",

@@ -24,7 +24,6 @@ export const WellnessAdminContent: React.FC = () => {
     });
     const [isUploading, setIsUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [success, setSuccess] = useState<string | null>(null);
     const [isViewingEnrollments, setIsViewingEnrollments] = useState(false);
     const [selectedClass, setSelectedClass] = useState<WellnessClass | null>(null);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -92,9 +91,7 @@ export const WellnessAdminContent: React.FC = () => {
                     ? `Wellness updated + ${recurringCount} future instances updated` 
                     : 'Wellness updated successfully')
                 : 'Wellness created successfully';
-            setSuccess(successMsg);
             showToast(successMsg, 'success');
-            setTimeout(() => setSuccess(null), 3000);
         },
         onError: (error: Error) => {
             setError(error.message || getNetworkErrorMessage());
@@ -118,16 +115,13 @@ export const WellnessAdminContent: React.FC = () => {
             return { snapshot };
         },
         onSuccess: () => {
-            setSuccess('Wellness deleted');
             showToast('Wellness deleted', 'success');
-            setTimeout(() => setSuccess(null), 3000);
         },
         onError: (_err, _classId, context) => {
             if (context?.snapshot !== undefined) {
                 queryClient.setQueryData(['wellness-classes'], context.snapshot);
             }
-            setError(getNetworkErrorMessage());
-            setTimeout(() => setError(null), 3000);
+            showToast(getNetworkErrorMessage(), 'error');
         },
         onSettled: () => {
             queryClient.invalidateQueries({ queryKey: ['wellness-classes'] });
@@ -380,11 +374,6 @@ export const WellnessAdminContent: React.FC = () => {
                 ))}
             </div>
 
-            {success && (
-                <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm">
-                    {success}
-                </div>
-            )}
 
             {error && !isEditing && (
                 <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm">

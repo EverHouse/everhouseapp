@@ -95,7 +95,7 @@ const Landing: React.FC = () => {
   };
 
   if (sessionChecked && user) {
-    return <div className="min-h-screen" />;
+    return <div className="min-h-screen bg-bone dark:bg-[#141414]" />;
   }
 
   return (

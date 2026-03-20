@@ -28,7 +28,7 @@ const PrivateHire: React.FC = () => {
   }, [setPageReady]);
 
   return (
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414] animate-page-enter">
        <SEO title="Private Events & Venue Hire | Ever Club, Tustin" description="Host private events, corporate gatherings & celebrations at Ever Club in Tustin. Trackman simulator bays, conference rooms & event spaces in OC." url="/private-hire" />
        <div 
          className="fixed top-0 left-0 right-0 bg-primary"

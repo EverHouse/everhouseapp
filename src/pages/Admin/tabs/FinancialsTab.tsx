@@ -15,6 +15,7 @@ import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import { FinancialsSubTabSkeleton } from '../../../components/skeletons';
 import { postWithCredentials } from '../../../hooks/queries/useFetch';
 import Icon from '../../../components/icons/Icon';
+import { useToast } from '../../../components/Toast';
 
 
 interface _SubscriptionListItem {
@@ -134,18 +135,16 @@ const SubscriptionsSubTab: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'past_due' | 'canceled'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sendingReminder, setSendingReminder] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<{ created: number; updated: number; skipped: number } | null>(null);
   const [localError, setLocalError] = useState<string | null>(null);
-  const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [subsMobileParent] = useAutoAnimate();
   const [subsTbodyParent] = useAutoAnimate();
 
   useEffect(() => {
     return () => {
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
     };
   }, []);
@@ -171,9 +170,7 @@ const SubscriptionsSubTab: React.FC = () => {
     try {
       const data = await postWithCredentials<{ created: number; updated: number; skipped: number }>('/api/stripe/sync-subscriptions', {});
       setSyncResult({ created: data.created, updated: data.updated, skipped: data.skipped });
-      setSuccessMessage(`Synced from Stripe: ${data.created} created, ${data.updated} updated`);
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
-      successTimerRef.current = setTimeout(() => setSuccessMessage(null), 5000);
+      showToast(`Synced from Stripe: ${data.created} created, ${data.updated} updated`, 'success');
       refetch();
     } catch (err: unknown) {
       setLocalError((err instanceof Error ? err.message : String(err)));
@@ -194,9 +191,7 @@ const SubscriptionsSubTab: React.FC = () => {
     setSendingReminder(subscriptionId);
     try {
       await postWithCredentials(`/api/financials/subscriptions/${subscriptionId}/send-reminder`, {});
-      setSuccessMessage('Payment reminder sent successfully');
-      if (successTimerRef.current) clearTimeout(successTimerRef.current);
-      successTimerRef.current = setTimeout(() => setSuccessMessage(null), 3000);
+      showToast('Payment reminder sent successfully', 'success');
     } catch (err: unknown) {
       setLocalError((err instanceof Error ? err.message : String(err)));
       if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
@@ -242,13 +237,6 @@ const SubscriptionsSubTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {successMessage && (
-        <div className="bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-700 rounded-xl p-4 flex items-center gap-3">
-          <Icon name="check_circle" className="text-green-600 dark:text-green-400" />
-          <p className="text-green-800 dark:text-green-300">{successMessage}</p>
-        </div>
-      )}
-
       {syncResult && (
         <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-xl p-4">
           <div className="flex items-center gap-3 mb-2">
