@@ -89,10 +89,12 @@ export async function syncMembershipTiersToStripe(): Promise<{
           if (hasMarketingFeatures) {
             updateParams.marketing_features = marketingFeatures;
           }
+          markAppOriginated(stripeProductId);
           await stripe.products.update(stripeProductId, updateParams);
           logger.info(`[Tier Sync] Updated existing product for ${tier.name} with privileges${hasMarketingFeatures ? ' and features' : ''}`);
 
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription', app_category: 'membership', source: 'ever_house_app' };
+          let priceChanged = false;
           
           if (stripePriceId) {
             try {
@@ -106,12 +108,15 @@ export async function syncMembershipTiersToStripe(): Promise<{
                   metadata: priceMetadata,
                   recurring: { interval: billingInterval },
                 };
+                markAppOriginated(stripeProductId);
                 const newPrice = await stripe.prices.create(priceParams, {
                   idempotencyKey: `price_replace_inactive_${tier.id}_${tier.priceCents}_${Date.now()}`
                 });
                 stripePriceId = newPrice.id;
+                priceChanged = true;
                 logger.info(`[Tier Sync] Created replacement price for ${tier.name} (old was inactive)`);
               } else if (existingPrice.unit_amount !== tier.priceCents) {
+                markAppOriginated(stripePriceId);
                 await stripe.prices.update(stripePriceId, { active: false });
                 const priceParams: Stripe.PriceCreateParams = {
                   product: stripeProductId,
@@ -120,10 +125,12 @@ export async function syncMembershipTiersToStripe(): Promise<{
                   metadata: priceMetadata,
                   recurring: { interval: billingInterval },
                 };
+                markAppOriginated(stripeProductId);
                 const newPrice = await stripe.prices.create(priceParams, {
                   idempotencyKey: `price_replace_changed_${tier.id}_${tier.priceCents}_${Date.now()}`
                 });
                 stripePriceId = newPrice.id;
+                priceChanged = true;
                 logger.info(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
               }
             } catch (priceErr: unknown) {
@@ -137,10 +144,12 @@ export async function syncMembershipTiersToStripe(): Promise<{
                   metadata: priceMetadata,
                   recurring: { interval: billingInterval },
                 };
+                markAppOriginated(stripeProductId);
                 const newPrice = await stripe.prices.create(priceParams, {
                   idempotencyKey: `price_replace_missing_${tier.id}_${tier.priceCents}_${Date.now()}`
                 });
                 stripePriceId = newPrice.id;
+                priceChanged = true;
                 logger.info(`[Tier Sync] Created replacement price for ${tier.name} (old was missing)`);
               } else {
                 throw priceErr;
@@ -154,10 +163,18 @@ export async function syncMembershipTiersToStripe(): Promise<{
               metadata: priceMetadata,
               recurring: { interval: billingInterval },
             };
+            markAppOriginated(stripeProductId);
             const newPrice = await stripe.prices.create(priceParams, {
               idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_new`
             });
             stripePriceId = newPrice.id;
+            priceChanged = true;
+          }
+
+          if (priceChanged) {
+            markAppOriginated(stripeProductId);
+            await stripe.products.update(stripeProductId, { default_price: stripePriceId });
+            logger.info(`[Tier Sync] Set default_price to ${stripePriceId} for product ${stripeProductId}`);
           }
 
           await db.update(membershipTiers)
@@ -192,12 +209,14 @@ export async function syncMembershipTiersToStripe(): Promise<{
           
           let stripeProduct;
           if (existingStripeProduct) {
+            markAppOriginated(existingStripeProduct.id);
             stripeProduct = await stripe.products.update(existingStripeProduct.id, createParams);
             logger.info(`[Tier Sync] Reusing existing Stripe product ${stripeProduct.id} for ${tier.name}`);
           } else {
             stripeProduct = await stripe.products.create(createParams, {
               idempotencyKey: `product_tier_${tier.id}_${tier.slug}`
             });
+            markAppOriginated(stripeProduct.id);
           }
           stripeProductId = stripeProduct.id;
 
@@ -209,10 +228,14 @@ export async function syncMembershipTiersToStripe(): Promise<{
             metadata: priceMetadata2,
             recurring: { interval: billingInterval },
           };
+          markAppOriginated(stripeProductId);
           const stripePrice = await stripe.prices.create(priceParams, {
             idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_create`
           });
           stripePriceId = stripePrice.id;
+
+          markAppOriginated(stripeProductId);
+          await stripe.products.update(stripeProductId, { default_price: stripePriceId });
 
           await db.update(membershipTiers)
             .set({
@@ -235,7 +258,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           synced++;
         }
       } catch (error: unknown) {
-        logger.error(`[Tier Sync] Error syncing tier ${tier.name}:`, { error: error });
+        logger.error(`[Tier Sync] Error syncing tier ${tier.name}:`, { error: getErrorMessage(error) });
         results.push({
           tierId: tier.id,
           tierName: tier.name,
@@ -251,7 +274,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
     logger.info(`[Tier Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, results, synced, failed, skipped };
   } catch (error: unknown) {
-    logger.error('[Tier Sync] Fatal error:', { error: error });
+    logger.error('[Tier Sync] Fatal error:', { error: getErrorMessage(error) });
     return {
       success: false,
       results,
@@ -286,7 +309,7 @@ export async function getTierSyncStatus(): Promise<Array<{
       stripePriceId: tier.stripePriceId,
     }));
   } catch (error: unknown) {
-    logger.error('[Tier Sync] Error getting status:', { error: error });
+    logger.error('[Tier Sync] Error getting status:', { error: getErrorMessage(error) });
     return [];
   }
 }
@@ -366,6 +389,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
         }
         
         try {
+          markAppOriginated(product.id);
           await stripe.products.update(product.id, { active: false });
           
           const reason = matchesTierName && !isFromApp
@@ -381,7 +405,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
           });
           archived++;
         } catch (archiveError: unknown) {
-          logger.error(`[Stripe Cleanup] Error archiving ${product.name}:`, { error: archiveError });
+          logger.error(`[Stripe Cleanup] Error archiving ${product.name}:`, { error: getErrorMessage(archiveError) });
           results.push({
             productId: product.id,
             productName: product.name,
@@ -401,7 +425,7 @@ export async function cleanupOrphanStripeProducts(): Promise<{
     logger.info(`[Stripe Cleanup] Complete: ${archived} archived, ${skipped} skipped, ${errors} errors`);
     return { success: true, archived, skipped, errors, results };
   } catch (error: unknown) {
-    logger.error('[Stripe Cleanup] Fatal error:', { error: error });
+    logger.error('[Stripe Cleanup] Fatal error:', { error: getErrorMessage(error) });
     return { success: false, archived, skipped, errors, results };
   }
 }

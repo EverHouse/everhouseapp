@@ -171,9 +171,51 @@ export async function handleProductCreated(client: PoolClient, product: Stripe.P
       deferredActions.push(async () => {
         await pullTierFeaturesFromStripe();
       });
-    } else {
-      logger.info(`[Stripe Webhook] New product ${product.id} created in Stripe. Use "Pull from Stripe" button to import if needed.`);
+      return deferredActions;
     }
+
+    const meta = product.metadata || {};
+    if (meta.tier_id) {
+      const tierId = parseInt(meta.tier_id, 10);
+      if (!isNaN(tierId)) {
+        const unlinkedTier = await client.query(
+          'SELECT id, name FROM membership_tiers WHERE id = $1 AND stripe_product_id IS NULL LIMIT 1',
+          [tierId]
+        );
+        if (unlinkedTier.rows.length > 0) {
+          await client.query(
+            'UPDATE membership_tiers SET stripe_product_id = $1, updated_at = NOW() WHERE id = $2',
+            [product.id, tierId]
+          );
+          logger.info(`[Stripe Webhook] Linked new Stripe product ${product.id} to tier "${unlinkedTier.rows[0].name}" via tier_id metadata`);
+          clearTierCache();
+          deferredActions.push(async () => {
+            await pullTierFeaturesFromStripe();
+          });
+          return deferredActions;
+        }
+      }
+    }
+
+    if (meta.cafe_item_id) {
+      const cafeId = parseInt(meta.cafe_item_id, 10);
+      if (!isNaN(cafeId)) {
+        const unlinkedCafe = await client.query(
+          'SELECT id, name FROM cafe_items WHERE id = $1 AND stripe_product_id IS NULL LIMIT 1',
+          [cafeId]
+        );
+        if (unlinkedCafe.rows.length > 0) {
+          await client.query(
+            'UPDATE cafe_items SET stripe_product_id = $1 WHERE id = $2',
+            [product.id, cafeId]
+          );
+          logger.info(`[Stripe Webhook] Linked new Stripe product ${product.id} to cafe item "${unlinkedCafe.rows[0].name}" via cafe_item_id metadata`);
+          return deferredActions;
+        }
+      }
+    }
+
+    logger.info(`[Stripe Webhook] New product ${product.id} created in Stripe — no matching local record found. Use "Pull from Stripe" to import if needed.`);
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling product.created:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
@@ -188,33 +230,85 @@ export async function handleProductDeleted(client: PoolClient, product: Stripe.P
     logger.info(`[Stripe Webhook] Product deleted: ${product.id} (${product.name})`);
 
     const tierMatch = await client.query(
-      'SELECT id, name FROM membership_tiers WHERE stripe_product_id = $1 LIMIT 1',
+      'SELECT id, name, product_type FROM membership_tiers WHERE stripe_product_id = $1 LIMIT 1',
       [product.id]
     );
 
     if (tierMatch.rows.length > 0) {
-      logger.warn(`[Stripe Webhook] WARNING: Tier product deleted in Stripe for tier "${tierMatch.rows[0].name}" (${product.id}). Tier data preserved in app.`);
+      const tier = tierMatch.rows[0];
+      const isSubscription = !tier.product_type || tier.product_type === 'subscription';
+
       await client.query(
-        'UPDATE membership_tiers SET stripe_product_id = NULL, stripe_price_id = NULL WHERE id = $1',
-        [tierMatch.rows[0].id]
+        'UPDATE membership_tiers SET stripe_product_id = NULL, stripe_price_id = NULL, is_active = false, updated_at = NOW() WHERE id = $1',
+        [tier.id]
       );
-      logger.info(`[Stripe Webhook] Cleared Stripe references for tier "${tierMatch.rows[0].name}" after product deletion`);
+
+      if (isSubscription) {
+        logger.warn(`[Stripe Webhook] Subscription tier "${tier.name}" deactivated — Stripe product ${product.id} was deleted. Re-activate in the app to recreate the Stripe product.`);
+      } else {
+        logger.warn(`[Stripe Webhook] Fee/pass "${tier.name}" deactivated — Stripe product ${product.id} was deleted.`);
+      }
+
       clearTierCache();
       return deferredActions;
     }
 
     const cafeResult = await client.query(
-      'UPDATE cafe_items SET is_active = false WHERE stripe_product_id = $1 AND is_active = true RETURNING id, name',
+      'UPDATE cafe_items SET is_active = false, stripe_product_id = NULL, stripe_price_id = NULL WHERE stripe_product_id = $1 AND is_active = true RETURNING id, name',
       [product.id]
     );
 
     if (cafeResult.rowCount && cafeResult.rowCount > 0) {
       for (const row of cafeResult.rows) {
-        logger.info(`[Stripe Webhook] Deactivated cafe item "${row.name}" (id: ${row.id}) due to Stripe product deletion`);
+        logger.info(`[Stripe Webhook] Deactivated cafe item "${row.name}" (id: ${row.id}) and cleared Stripe references due to product deletion`);
       }
     }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling product.deleted:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+  }
+
+  return deferredActions;
+}
+
+export async function handlePriceDeleted(client: PoolClient, price: Stripe.Price): Promise<DeferredAction[]> {
+  const deferredActions: DeferredAction[] = [];
+
+  try {
+    if (isAppOriginated(price.id)) {
+      logger.info(`[Stripe Webhook] Skipping app-originated price.deleted for ${price.id}`);
+      return deferredActions;
+    }
+
+    const productId = typeof price.product === 'string' ? price.product : price.product?.id;
+    logger.info(`[Stripe Webhook] Price deleted: ${price.id} for product ${productId || 'unknown'}`);
+
+    const tierResult = await client.query(
+      'UPDATE membership_tiers SET stripe_price_id = NULL, updated_at = NOW() WHERE stripe_price_id = $1 RETURNING id, name, slug',
+      [price.id]
+    );
+
+    if (tierResult.rowCount && tierResult.rowCount > 0) {
+      for (const row of tierResult.rows) {
+        logger.warn(`[Stripe Webhook] Cleared stripe_price_id for tier "${row.name}" — price ${price.id} was deleted in Stripe`);
+        if (row.slug === 'simulator-overage-30min' || row.slug === 'guest-pass') {
+          logger.warn(`[Stripe Webhook] Fee product "${row.name}" lost its price — re-save fees or run "Sync to Stripe" to recreate`);
+        }
+      }
+      clearTierCache();
+    }
+
+    const cafeResult = await client.query(
+      'UPDATE cafe_items SET stripe_price_id = NULL WHERE stripe_price_id = $1 RETURNING id, name',
+      [price.id]
+    );
+
+    if (cafeResult.rowCount && cafeResult.rowCount > 0) {
+      for (const row of cafeResult.rows) {
+        logger.warn(`[Stripe Webhook] Cleared stripe_price_id for cafe item "${row.name}" — price ${price.id} was deleted in Stripe`);
+      }
+    }
+  } catch (error: unknown) {
+    logger.error('[Stripe Webhook] Error handling price.deleted:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
   }
 
   return deferredActions;

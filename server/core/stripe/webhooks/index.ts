@@ -55,6 +55,7 @@ import {
   handleProductCreated,
   handleProductDeleted,
   handlePriceChange,
+  handlePriceDeleted,
 } from './handlers/catalog';
 
 import {
@@ -119,6 +120,8 @@ async function dispatchWebhookEvent(
     return handleProductDeleted(client, dataObject);
   } else if (eventType === 'price.updated' || eventType === 'price.created') {
     return handlePriceChange(client, dataObject);
+  } else if (eventType === 'price.deleted') {
+    return handlePriceDeleted(client, dataObject as Stripe.Price);
   } else if (eventType === 'coupon.updated' || eventType === 'coupon.created') {
     const coupon = dataObject as Stripe.Coupon;
     if (coupon.id === 'FAMILY20' && coupon.percent_off) {

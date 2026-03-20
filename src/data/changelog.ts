@@ -8,6 +8,19 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.11",
+    date: "2026-03-20",
+    title: "Complete Bidirectional Stripe Sync",
+    changes: [
+      "Fixed: When a Stripe product is deleted, the matching membership tier or fee is now fully deactivated in the app — previously it only cleared the Stripe IDs, leaving an orphaned active tier with no Stripe backing",
+      "Added: price.deleted webhook handler — when a price is deleted in Stripe, the app now clears the local stripe_price_id reference so it won't try to use a deleted price for checkouts or renewals",
+      "Improved: product.created webhook now auto-links Stripe products to existing tiers or cafe items when the product metadata contains a matching tier_id or cafe_item_id",
+      "Fixed: Bulk sync to Stripe (Force Sync) now marks all outbound Stripe API calls as app-originated before sending — prevents webhook echo loops that could cause unnecessary DB writes",
+      "Fixed: Bulk sync now sets the product's default_price in Stripe after creating new or replacement prices — prevents Stripe Dashboard from showing stale prices",
+      "Fixed: Several error logging calls in the sync module were passing raw error objects instead of using getErrorMessage()",
+    ]
+  },
+  {
     version: "8.94.10",
     date: "2026-03-20",
     title: "Fix Stripe ID Preservation & Tier Validation",

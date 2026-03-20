@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.11] - 2026-03-20
+
+### Complete Bidirectional Stripe Sync
+- **Fixed**: When a Stripe product is deleted, the matching membership tier, fee, or pass is now fully deactivated in the app (sets `is_active = false`). Previously it only cleared the `stripe_product_id` and `stripe_price_id`, leaving an orphaned active tier with no Stripe backing — new subscriptions to it would silently fail.
+- **Added**: `price.deleted` webhook handler. When a price is deleted in Stripe, the app clears the local `stripe_price_id` reference from matching tiers or cafe items so it won't try to use a deleted price for checkouts or renewals. Logs warnings for fee products (guest-pass, overage) that lose their price.
+- **Improved**: `product.created` webhook now auto-links Stripe products to existing local records when the product's metadata contains a matching `tier_id` or `cafe_item_id`, instead of only logging. This handles the case where products are recreated in Stripe.
+- **Fixed**: Bulk sync (`syncMembershipTiersToStripe`) now calls `markAppOriginated()` before every outbound Stripe API call (product create/update, price create/deactivate, default_price update, orphan archive). Previously these mutations triggered webhook echoes that caused unnecessary DB writes.
+- **Fixed**: Bulk sync now sets `default_price` on the Stripe product after creating any new or replacement price. Previously the product could show a stale default price in the Stripe Dashboard.
+- **Fixed**: Error logging in `productSync.ts` now uses `getErrorMessage()` consistently instead of raw error objects.
+- **Added**: `handlePriceDeleted` export from `catalog.ts`, wired into the webhook dispatcher.
+- **Scope**: `webhooks/handlers/catalog.ts`, `webhooks/index.ts`, `productSync.ts`.
+
 ## [8.94.10] - 2026-03-20
 
 ### Fix Stripe ID Preservation on Tier Save
