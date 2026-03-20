@@ -8,6 +8,25 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.95.0",
+    date: "2026-03-20",
+    title: "Dynamic Tiers: Deactivation Warning, Dynamic Names, HubSpot Auto-Sync",
+    isMajor: true,
+    changes: [
+      "Added: Deactivation warning dialog shows active member count before a tier can be toggled inactive — prevents accidental deactivation of tiers with paying members",
+      "Added: Tier names are now fully dynamic — new tiers with custom names (e.g., 'Platinum', 'Weekend') no longer require code changes to work across the system",
+      "Removed: Hardcoded database CHECK constraint on tier names — the normalization trigger now reads directly from the membership_tiers table",
+      "Added: Tier registry loads from the database on startup and refreshes automatically when tiers are created or updated",
+      "Added: HubSpot membership_tier dropdown options auto-sync from the database — new tiers automatically appear as HubSpot property options without manual setup",
+      "Added: HubSpot tier dropdown sync triggers on tier create and tier rename (fire-and-forget, respects read-only mode)",
+      "Improved: denormalizeTierForHubSpot now accepts any tier name, not just the original 7 hardcoded tiers",
+      "Improved: Admin directory filter, member profile drawer, membership application, and staff direct-add modal all load tier options dynamically from the API",
+      "Fixed: Comparison page default tier selection now uses the first 3 tiers from the API instead of hardcoded names",
+      "Fixed: Tier limits fallback no longer returns hardcoded 'Social' name — returns the requested tier name with restrictive permissions",
+      "Cleaned: Removed dead TIER_OPTIONS_FALLBACK, ASSIGNABLE_TIERS_FALLBACK exports and unused TIER_NAMES/DEFAULT_TIER re-exports from frontend",
+    ]
+  },
+  {
     version: "8.94.18",
     date: "2026-03-20",
     title: "Tier Editor UX: Vertical IDs, Copy Buttons, Price Input, Sheet Titles",

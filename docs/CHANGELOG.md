@@ -2,6 +2,21 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.95.0] - 2026-03-20
+
+### Dynamic Tiers: Deactivation Warning, Dynamic Names, HubSpot Auto-Sync
+- **Added**: Deactivation warning dialog shows active member count before a tier can be toggled inactive — prevents accidental deactivation of tiers with paying members.
+- **Added**: Tier names are now fully dynamic — new tiers with custom names no longer require code changes. The DB CHECK constraint was removed; the normalization trigger now reads from the `membership_tiers` table.
+- **Added**: `server/core/tierRegistry.ts` loads tiers from DB on startup; `shared/constants/tiers.ts` and `server/utils/tierUtils.ts` populated dynamically via `setTierData()`/`setServerTierData()`.
+- **Added**: HubSpot `membership_tier` dropdown options auto-sync from the database via `ensureHubSpotPropertiesExist`. New tiers automatically appear as HubSpot property options.
+- **Added**: HubSpot tier dropdown sync triggers fire-and-forget on tier create and rename in `server/routes/membershipTiers.ts`.
+- **Improved**: `denormalizeTierForHubSpot`/`denormalizeTierForHubSpotAsync` now accept any tier name, not just 7 hardcoded ones. Unknown tiers get "{Name} Membership" suffix.
+- **Improved**: Frontend components (`DirectoryFilters`, `MemberProfileDrawer`, `MembershipApply`, `StaffDirectAddModal`) load tier options dynamically via `useTierNames()` hook.
+- **Fixed**: Comparison page default tier selection now picks first 3 tiers from API data instead of hardcoded `['Social', 'Core', 'Premium']`.
+- **Fixed**: Tier limits fallback returns the requested tier name with restrictive permissions instead of hardcoded `'Social'`.
+- **Cleaned**: Removed dead `TIER_OPTIONS_FALLBACK`, `ASSIGNABLE_TIERS_FALLBACK` exports from `directoryTypes.ts` and unused `TIER_NAMES`/`DEFAULT_TIER` re-exports from `permissions.ts`.
+- **Scope**: `server/core/tierRegistry.ts`, `server/utils/tierUtils.ts`, `server/db-init.ts`, `server/routes/membershipTiers.ts`, `server/core/hubspot/stages.ts`, `server/core/hubspot/constants.ts`, `shared/constants/tiers.ts`, `src/hooks/useTierNames.ts`, `src/pages/Admin/tabs/TiersTab/useTiersTab.ts`, `src/pages/Admin/tabs/directory/directoryTypes.ts`, `src/pages/Admin/tabs/directory/DirectoryFilters.tsx`, `src/pages/Public/Membership.tsx`, `src/pages/Public/MembershipApply.tsx`, `src/utils/permissions.ts`.
+
 ## [8.94.18] - 2026-03-20
 
 ### Tier Editor UX: Vertical IDs, Copy Buttons, Price Input, Sheet Titles

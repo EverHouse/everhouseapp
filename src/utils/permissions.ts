@@ -1,8 +1,6 @@
 import { 
   normalizeTierName, 
   TierName,
-  DEFAULT_TIER,
-  TIER_NAMES 
 } from '../../shared/constants/tiers';
 
 export type BaseTier = TierName;
@@ -21,5 +19,3 @@ export function getDisplayTierName(tierName: string): string {
 }
 
 export type MembershipTier = BaseTier;
-
-export { DEFAULT_TIER, TIER_NAMES };

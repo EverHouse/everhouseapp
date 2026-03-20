@@ -123,14 +123,14 @@ router.get('/api/membership-tiers/limits/:tierName', async (req, res) => {
     
     if (result.rows.length === 0) {
       return res.json({
-        name: 'Social',
+        name: tierName,
         daily_sim_minutes: 0,
         guest_passes_per_year: 0,
         booking_window_days: 7,
         daily_conf_room_minutes: 0,
         can_book_simulators: false,
         can_book_conference: false,
-        can_book_wellness: true,
+        can_book_wellness: false,
         has_group_lessons: false,
         has_extended_sessions: false,
         has_private_lesson: false,

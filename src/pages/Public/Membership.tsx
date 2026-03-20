@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Routes, Route, useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import BackToTop from '../../components/BackToTop';
@@ -493,7 +493,8 @@ const CompareFeatures: React.FC = () => {
   const [tiers, setTiers] = useState<MembershipTier[]>([]);
   const [tierFeatures, setTierFeatures] = useState<TierFeature[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTiers, setSelectedTiers] = useState<string[]>(['Social', 'Core', 'Premium']);
+  const [selectedTiers, setSelectedTiers] = useState<string[]>([]);
+  const defaultsSet = useRef(false);
 
   useEffect(() => {
     if (!loading) {
@@ -515,6 +516,10 @@ const CompareFeatures: React.FC = () => {
         if (tiersData) {
           const filteredTiers = tiersData.filter((t: MembershipTier) => t.show_in_comparison !== false);
           setTiers(filteredTiers);
+          if (!defaultsSet.current) {
+            setSelectedTiers(filteredTiers.slice(0, 3).map(t => t.name));
+            defaultsSet.current = true;
+          }
         }
 
         if (featuresData) {
