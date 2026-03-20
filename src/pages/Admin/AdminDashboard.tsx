@@ -661,12 +661,33 @@ const StaffTrainingGuide: React.FC = () => {
                 {sections.map((section) => (
                     <div 
                         key={section.id}
-                        className="tactile-row group bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden print:border print:border-gray-200 print:break-inside-avoid hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        className="group bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden print:border print:border-gray-200 print:break-inside-avoid hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer scroll-mt-20"
                         role="button"
                         tabIndex={0}
                         aria-expanded={expandedSection === String(section.id)}
-                        onClick={() => setExpandedSection(expandedSection === String(section.id) ? null : String(section.id))}
-                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSection(expandedSection === String(section.id) ? null : String(section.id)); } }}
+                        onClick={(e) => {
+                            const isExpanding = expandedSection !== String(section.id);
+                            setExpandedSection(isExpanding ? String(section.id) : null);
+                            if (isExpanding) {
+                                const el = e.currentTarget;
+                                requestAnimationFrame(() => {
+                                    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                });
+                            }
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                const isExpanding = expandedSection !== String(section.id);
+                                setExpandedSection(isExpanding ? String(section.id) : null);
+                                if (isExpanding) {
+                                    const el = e.currentTarget;
+                                    requestAnimationFrame(() => {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    });
+                                }
+                            }
+                        }}
                     >
                         <div className="flex items-center">
                             <div
