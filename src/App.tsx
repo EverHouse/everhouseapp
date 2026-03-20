@@ -10,6 +10,7 @@ import DirectionalPageTransition, { TransitionContext, PageExitContext } from '.
 import Logo from './components/Logo';
 import MenuOverlay from './components/MenuOverlay';
 import MemberMenuOverlay from './components/MemberMenuOverlay';
+import { pathToTab } from './lib/nav-constants';
 const ViewAsBanner = lazy(() => import('./components/ViewAsBanner'));
 import PageErrorBoundary from './components/PageErrorBoundary';
 import Avatar from './components/Avatar';
@@ -922,7 +923,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 <StaffMobileSidebar 
                   isOpen={isStaffMenuOpen} 
                   onClose={() => setIsStaffMenuOpen(false)} 
-                  activeTab="home"
+                  activeTab={pathToTab[location.pathname] ?? null}
                   isAdmin={actualUser?.role === 'admin'}
                 />
               </Suspense>

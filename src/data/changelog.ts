@@ -15,6 +15,7 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Switching tabs across the app (booking, wellness, history, admin) no longer causes a visual flash — the old tab content now fades out cleanly before the new content fades in",
       "Fixed: Booking page tab switch no longer briefly resets the selected date when the date hasn't actually changed, preventing an unnecessary flash in the availability section",
       "Improved: Wellness page loading state now shows skeleton cards that match the layout of real class cards, instead of a generic spinner that caused content to pop in abruptly",
+      "Fixed: Staff members on the Profile page can now navigate to the admin Dashboard via the hamburger menu — previously Dashboard was always highlighted as active and clicking it did nothing",
     ]
   },
   {

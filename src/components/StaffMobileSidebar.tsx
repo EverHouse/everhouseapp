@@ -13,7 +13,7 @@ import Icon from './icons/Icon';
 interface StaffMobileSidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeTab: TabType;
+  activeTab: TabType | null;
   isAdmin?: boolean;
 }
 
@@ -75,7 +75,7 @@ export const StaffMobileSidebar: React.FC<StaffMobileSidebarProps> = ({
   const displayActiveTab = optimisticTab || activeTab;
 
   const navigateToTab = useCallback((tab: TabType) => {
-    if (tab === activeTab) return;
+    if (activeTab !== null && tab === activeTab) return;
     if (tabToPath[tab]) {
       startNavigation();
       setOptimisticTab(tab);
