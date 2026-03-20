@@ -67,16 +67,26 @@ Staff scans QR code (MEMBER:<uuid>)
 
 ```
 Staff activates kiosk mode (navigates to /kiosk)
-  → Full-screen QR scanner (always-on camera)
+  → Full-screen premium UI: radial gradient bg, lavender (#CCB8E4) accents, centered mascot header, script logo footer
+  → Idle screen: ghost button (transparent bg, lavender border) with .tactile-btn spring physics
   → Member scans membership QR code (MEMBER:<uuid>)
     → POST /api/kiosk/checkin (staff session authenticates device)
       ├── Validate member exists and status not blocked
       ├── processWalkInCheckin (same as QR/NFC walk-in)
+      ├── Query today's upcoming bookings (confirmed/approved, start_time >= now Pacific)
+      ├── Return upcomingBooking: { bookingId, sessionId, startTime, endTime, resourceName, resourceType, declaredPlayerCount, ownerEmail, ownerName, unpaidFeeCents }
       ├── Audit log with source: 'kiosk_qr'
       └── Return member name, tier, visit count
-    → Success screen (4s auto-reset) or error screen (3s auto-reset)
+    → Success screen:
+      ├── Dynamic greeting: "Good morning/afternoon/evening, {firstName}" (Pacific time)
+      ├── Tier badge with metallic glow
+      ├── If upcoming booking today: glassmorphism card (time, resource, players)
+      ├── If unpaid fees + sessionId: Pay Now button → MemberPaymentModal
+      ├── Auto-reset: 5s (no booking) or 25s (with booking); paused while payment modal open
+      └── Error screen: 3s auto-reset
     → Scanner restarts automatically
-  → Staff exits by holding close button 3 seconds → redirects to /admin
+  → QR scanner: DOM-ready check via requestAnimationFrame, 10s camera init timeout with retry
+  → Staff exits via passcode modal (glassmorphism, explicit Submit button, Enter key support) → redirects to /admin
 ```
 
 ## Hard Rules

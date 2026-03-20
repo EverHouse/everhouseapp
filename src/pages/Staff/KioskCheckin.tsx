@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthData } from '../../contexts/DataContext';
 import { parseQrCode } from '../../utils/qrCodeParser';
 import Icon from '../../components/icons/Icon';
+import { MemberPaymentModal } from '../../components/booking/MemberPaymentModal';
 
 interface Html5QrcodeInstance {
   getState(): number;
@@ -17,14 +18,49 @@ interface Html5QrcodeInstance {
 
 type KioskState = 'idle' | 'scanning' | 'processing' | 'success' | 'already_checked_in' | 'error';
 
+interface UpcomingBooking {
+  bookingId: number;
+  sessionId: number | null;
+  startTime: string;
+  endTime: string;
+  resourceName: string;
+  resourceType: string;
+  declaredPlayerCount: number;
+  ownerEmail: string;
+  ownerName: string;
+  unpaidFeeCents: number;
+}
+
 interface CheckinResult {
   memberName: string;
   tier: string | null;
   lifetimeVisits: number;
+  upcomingBooking?: UpcomingBooking | null;
 }
 
-const RESET_DELAY_SUCCESS = 4000;
+const ACCENT = '#CCB8E4';
+const BG_GRADIENT = 'radial-gradient(ellipse at 50% 40%, #2f3d1a 0%, #1a220c 60%, #0d1106 100%)';
+const RESET_DELAY_SUCCESS = 5000;
+const RESET_DELAY_WITH_BOOKING = 25000;
 const RESET_DELAY_ERROR = 3000;
+
+function getPacificGreeting(): string {
+  const h = parseInt(
+    new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', hour12: false }),
+    10
+  );
+  if (h < 12) return 'Good morning';
+  if (h < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function formatTime12h(time24: string): string {
+  if (!time24) return '';
+  const [h, m] = time24.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 || 12;
+  return `${hour12}:${String(m).padStart(2, '0')} ${period}`;
+}
 
 const KioskCheckin: React.FC = () => {
   const { actualUser, sessionChecked } = useAuthData();
@@ -33,12 +69,15 @@ const KioskCheckin: React.FC = () => {
   const [checkinResult, setCheckinResult] = useState<CheckinResult | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   const [showPasscodeModal, setShowPasscodeModal] = useState(false);
   const [passcodeDigits, setPasscodeDigits] = useState<string[]>(['', '', '', '']);
   const [passcodeError, setPasscodeError] = useState(false);
   const [passcodeChecking, setPasscodeChecking] = useState(false);
   const passcodeInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const passcodeDigitsRef = useRef<string[]>(['', '', '', '']);
+  passcodeDigitsRef.current = passcodeDigits;
 
   const qrScannerRef = useRef<Html5QrcodeInstance | null>(null);
   const hasScannedRef = useRef(false);
@@ -64,45 +103,6 @@ const KioskCheckin: React.FC = () => {
     }
   }, []);
 
-  const startScanner = useCallback(async () => {
-    await stopScanner();
-    hasScannedRef.current = false;
-    setCameraError(null);
-
-    const containerEl = document.getElementById(elementId);
-    if (!containerEl) return;
-
-    try {
-      const { Html5Qrcode } = await import('html5-qrcode');
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        setCameraError('No cameras found. Please connect a camera.');
-        return;
-      }
-
-      const qrScanner = new Html5Qrcode(elementId);
-      qrScannerRef.current = qrScanner;
-
-      await qrScanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 280, height: 280 },
-          aspectRatio: 1.0,
-        },
-        (decodedText) => {
-          if (!hasScannedRef.current) {
-            hasScannedRef.current = true;
-            handleScan(decodedText);
-          }
-        },
-        () => {}
-      );
-    } catch (err: unknown) {
-      setCameraError(`Camera error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }, [elementId, stopScanner]);
-
   const handleScan = useCallback(async (decodedText: string) => {
     const parsed = parseQrCode(decodedText);
     if (parsed.type !== 'member' || !parsed.memberId) {
@@ -127,7 +127,8 @@ const KioskCheckin: React.FC = () => {
         setCheckinResult({
           memberName: data.memberName,
           tier: data.tier,
-          lifetimeVisits: data.lifetimeVisits
+          lifetimeVisits: data.lifetimeVisits,
+          upcomingBooking: data.upcomingBooking || null
         });
         setState('success');
       } else if (data.alreadyCheckedIn) {
@@ -147,18 +148,73 @@ const KioskCheckin: React.FC = () => {
     }
   }, []);
 
+  const scannerStartedRef = useRef(false);
+
+  const startScanner = useCallback(async () => {
+    await stopScanner();
+    hasScannedRef.current = false;
+    scannerStartedRef.current = false;
+    setCameraError(null);
+
+    const containerEl = document.getElementById(elementId);
+    if (!containerEl) return;
+
+    const initTimeout = setTimeout(() => {
+      if (!scannerStartedRef.current) {
+        setCameraError('Camera took too long to initialize. Please try again.');
+      }
+    }, 10000);
+
+    try {
+      const { Html5Qrcode } = await import('html5-qrcode');
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        clearTimeout(initTimeout);
+        setCameraError('No cameras found. Please connect a camera.');
+        return;
+      }
+
+      const qrScanner = new Html5Qrcode(elementId);
+      qrScannerRef.current = qrScanner;
+
+      await qrScanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: 10,
+          qrbox: { width: 280, height: 280 },
+          aspectRatio: 1.0,
+        },
+        (decodedText) => {
+          if (!hasScannedRef.current) {
+            hasScannedRef.current = true;
+            handleScan(decodedText);
+          }
+        },
+        () => {}
+      );
+      scannerStartedRef.current = true;
+      clearTimeout(initTimeout);
+    } catch (err: unknown) {
+      clearTimeout(initTimeout);
+      setCameraError(`Camera error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }, [elementId, stopScanner, handleScan]);
+
   const resetToIdle = useCallback(() => {
     stopScanner();
     setState('idle');
     setCheckinResult(null);
     setErrorMessage('');
+    setShowPaymentModal(false);
     hasScannedRef.current = false;
   }, [stopScanner]);
 
   useEffect(() => {
+    if (showPaymentModal) return;
     if (state === 'success' || state === 'already_checked_in') {
       stopScanner();
-      resetTimerRef.current = setTimeout(resetToIdle, RESET_DELAY_SUCCESS);
+      const delay = checkinResult?.upcomingBooking ? RESET_DELAY_WITH_BOOKING : RESET_DELAY_SUCCESS;
+      resetTimerRef.current = setTimeout(resetToIdle, delay);
     } else if (state === 'error') {
       stopScanner();
       resetTimerRef.current = setTimeout(resetToIdle, RESET_DELAY_ERROR);
@@ -166,12 +222,13 @@ const KioskCheckin: React.FC = () => {
     return () => {
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
     };
-  }, [state, stopScanner, resetToIdle]);
+  }, [state, stopScanner, resetToIdle, showPaymentModal, checkinResult?.upcomingBooking]);
 
   useEffect(() => {
     return () => {
       stopScanner();
       if (resetTimerRef.current) clearTimeout(resetTimerRef.current);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, [stopScanner]);
 
@@ -225,10 +282,23 @@ const KioskCheckin: React.FC = () => {
     };
   }, []);
 
+  const rafRef = useRef<number | null>(null);
+
   const handleStartCheckin = useCallback(() => {
     setState('scanning');
-    setTimeout(() => startScanner(), 500);
-  }, [startScanner]);
+    let attempts = 0;
+    const waitForElement = () => {
+      const el = document.getElementById(elementId);
+      if (el) {
+        rafRef.current = null;
+        startScanner();
+      } else if (attempts < 60) {
+        attempts++;
+        rafRef.current = requestAnimationFrame(waitForElement);
+      }
+    };
+    rafRef.current = requestAnimationFrame(waitForElement);
+  }, [startScanner, elementId]);
 
   const handlePasscodeOpen = useCallback(() => {
     setShowPasscodeModal(true);
@@ -286,39 +356,45 @@ const KioskCheckin: React.FC = () => {
     if (value && !/^\d$/.test(value)) return;
 
     setPasscodeError(false);
-    const newDigits = [...passcodeDigits];
-    newDigits[index] = value;
-    setPasscodeDigits(newDigits);
+    setPasscodeDigits(prev => {
+      const newDigits = [...prev];
+      newDigits[index] = value;
+      return newDigits;
+    });
 
     if (value && index < 3) {
-      passcodeInputRefs.current[index + 1]?.focus();
+      setTimeout(() => passcodeInputRefs.current[index + 1]?.focus(), 0);
     }
-
-    if (value && index === 3) {
-      handlePasscodeSubmit(newDigits);
-    }
-  }, [passcodeDigits, handlePasscodeSubmit]);
+  }, []);
 
   const handlePasscodeKeyDown = useCallback((index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !passcodeDigits[index] && index > 0) {
-      const newDigits = [...passcodeDigits];
-      newDigits[index - 1] = '';
-      setPasscodeDigits(newDigits);
-      passcodeInputRefs.current[index - 1]?.focus();
+    if (e.key === 'Backspace') {
+      const currentDigit = passcodeDigitsRef.current[index];
+      if (!currentDigit && index > 0) {
+        setPasscodeDigits(prev => {
+          const newDigits = [...prev];
+          newDigits[index - 1] = '';
+          return newDigits;
+        });
+        setTimeout(() => passcodeInputRefs.current[index - 1]?.focus(), 0);
+      }
     }
-  }, [passcodeDigits]);
+    if (e.key === 'Enter') {
+      handlePasscodeSubmit(passcodeDigitsRef.current);
+    }
+  }, [handlePasscodeSubmit]);
 
   if (!sessionChecked) {
     return (
-      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 9999, background: '#293515' }}>
-        <div className="w-12 h-12 rounded-full border-4 border-white/20 border-t-[#CCB8E4] animate-spin" />
+      <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 9999, background: BG_GRADIENT }}>
+        <div className="w-12 h-12 rounded-full border-4 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
       </div>
     );
   }
 
   if (!isStaff) {
     return (
-      <div className="fixed inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 9999, background: 'linear-gradient(180deg, #293515 0%, #1f2a0f 100%)' }}>
+      <div className="fixed inset-0 flex flex-col items-center justify-center px-6" style={{ zIndex: 9999, background: BG_GRADIENT }}>
         <div className="w-20 h-20 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6">
           <Icon name="lock" className="text-5xl text-red-400" />
         </div>
@@ -334,11 +410,14 @@ const KioskCheckin: React.FC = () => {
     );
   }
 
+  const booking = checkinResult?.upcomingBooking;
+  const firstName = checkinResult?.memberName?.split(' ')[0] || '';
+
   return (
-    <div className="fixed inset-0 flex flex-col select-none" style={{ zIndex: 9999, touchAction: 'none', background: 'linear-gradient(180deg, #293515 0%, #1f2a0f 50%, #1a220c 100%)' }}>
+    <div className="fixed inset-0 flex flex-col select-none" style={{ zIndex: 9999, touchAction: 'none', background: BG_GRADIENT }}>
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }} />
 
-      <div className="relative flex items-center justify-between px-6 pt-6 pb-4 flex-shrink-0">
+      <div className="relative flex items-center justify-center px-6 pt-6 pb-4 flex-shrink-0">
         <img
           src="/assets/logos/mascot-white.webp"
           alt="Ever Club"
@@ -346,7 +425,7 @@ const KioskCheckin: React.FC = () => {
         />
         <button
           onClick={handlePasscodeOpen}
-          className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+          className="absolute right-6 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
           aria-label="Exit kiosk mode"
         >
           <Icon name="lock_open" className="text-white/20 text-base" />
@@ -355,20 +434,32 @@ const KioskCheckin: React.FC = () => {
 
       <div className="relative flex-1 flex flex-col items-center justify-center px-6">
         {state === 'idle' && (
-          <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-500">
-            <div className="w-24 h-24 rounded-3xl bg-[#CCB8E4]/10 flex items-center justify-center mx-auto mb-6 border border-[#CCB8E4]/20">
-              <Icon name="qr_code_scanner" className="text-6xl text-[#CCB8E4]" />
+          <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-500 relative">
+            <div
+              className="absolute w-72 h-72 rounded-full pointer-events-none"
+              style={{ background: `radial-gradient(circle, rgba(204,184,228,0.08) 0%, transparent 70%)`, top: '-40px' }}
+            />
+
+            <div
+              className="relative w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6"
+              style={{ background: `rgba(204,184,228,0.08)`, border: `1px solid rgba(204,184,228,0.25)` }}
+            >
+              <Icon name="qr_code_scanner" className="text-6xl" style={{ color: ACCENT }} />
             </div>
             <h1 className="text-4xl font-bold text-white tracking-tight mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Self Check-In</h1>
             <p className="text-white/50 text-lg mb-10 text-center">Tap the button below to scan your membership QR code</p>
 
             <button
               onClick={handleStartCheckin}
-              className="group relative px-10 py-5 rounded-2xl text-[#293515] text-xl font-semibold transition-all duration-200 shadow-lg"
-              style={{ background: '#CCB8E4', boxShadow: '0 8px 32px rgba(204, 184, 228, 0.3)' }}
+              className="tactile-btn group relative px-10 py-5 rounded-2xl text-xl font-semibold transition-all duration-200"
+              style={{
+                background: 'transparent',
+                border: `1.5px solid ${ACCENT}`,
+                color: '#fff'
+              }}
             >
               <span className="flex items-center gap-3">
-                <Icon name="photo_camera" className="text-2xl" />
+                <Icon name="photo_camera" className="text-2xl" style={{ color: ACCENT }} />
                 Start Check-In
               </span>
             </button>
@@ -407,7 +498,7 @@ const KioskCheckin: React.FC = () => {
         {state === 'processing' && (
           <div className="text-center animate-in fade-in duration-200">
             <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-6">
-              <div className="w-10 h-10 rounded-full border-4 border-white/20 border-t-[#CCB8E4] animate-spin" />
+              <div className="w-10 h-10 rounded-full border-4 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
             </div>
             <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-headline)' }}>Checking you in...</h2>
             <p className="text-white/40 mt-2">Just a moment</p>
@@ -415,21 +506,74 @@ const KioskCheckin: React.FC = () => {
         )}
 
         {state === 'success' && checkinResult && (
-          <div className="text-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-24 h-24 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto mb-6">
+          <div className="text-center animate-in fade-in zoom-in-95 duration-500 w-full max-w-md">
+            <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(16,185,129,0.15)' }}>
               <Icon name="check_circle" className="text-6xl text-emerald-400" />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Welcome back!</h2>
-            <p className="text-[#CCB8E4] text-2xl font-semibold">{checkinResult.memberName}</p>
+            <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>
+              {getPacificGreeting()}, {firstName}
+            </h2>
+            <p className="text-2xl font-semibold" style={{ color: ACCENT }}>{checkinResult.memberName}</p>
             {checkinResult.tier && (
-              <span className="inline-block mt-3 px-4 py-1.5 rounded-full bg-white/10 text-white/70 text-sm font-medium">
+              <span
+                className="inline-block mt-3 px-4 py-1.5 rounded-full text-sm font-medium"
+                style={{
+                  background: 'rgba(204,184,228,0.1)',
+                  border: '1px solid rgba(204,184,228,0.3)',
+                  color: ACCENT,
+                  boxShadow: '0 0 12px rgba(204,184,228,0.15)'
+                }}
+              >
                 {checkinResult.tier}
               </span>
             )}
             {checkinResult.lifetimeVisits > 0 && (
-              <p className="text-white/40 text-sm mt-4">
+              <p className="text-white/40 text-sm mt-3">
                 Visit #{checkinResult.lifetimeVisits}
               </p>
+            )}
+
+            {booking && (
+              <div
+                className="mt-6 rounded-2xl p-5 text-left backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-500"
+                style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
+                }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <Icon name="event" className="text-lg" style={{ color: ACCENT }} />
+                  <span className="text-white/70 text-sm font-medium">Upcoming Booking</span>
+                </div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-white font-semibold text-lg">{booking.resourceName}</span>
+                  <span className="text-white/60 text-sm">
+                    {booking.declaredPlayerCount} {booking.declaredPlayerCount === 1 ? 'player' : 'players'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-white/50 text-sm mb-1">
+                  <Icon name="schedule" className="text-sm" style={{ color: ACCENT }} />
+                  <span>{formatTime12h(booking.startTime)} – {formatTime12h(booking.endTime)}</span>
+                </div>
+
+                {booking.unpaidFeeCents > 0 && booking.sessionId && (
+                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-white/50 text-sm">
+                        Fees due: <span className="text-white font-medium">${(booking.unpaidFeeCents / 100).toFixed(2)}</span>
+                      </span>
+                      <button
+                        onClick={() => setShowPaymentModal(true)}
+                        className="tactile-btn px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200"
+                        style={{ background: ACCENT, color: '#293515' }}
+                      >
+                        Pay Now
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -459,16 +603,30 @@ const KioskCheckin: React.FC = () => {
         )}
       </div>
 
-      <div className="relative pb-6 text-center">
-        <p className="text-white/15 text-xs tracking-wider uppercase" style={{ fontFamily: 'var(--font-label)' }}>Ever Club</p>
+      <div className="relative pb-6 flex justify-center">
+        <img
+          src="/images/everclub-logo-light.webp"
+          alt="Ever Club"
+          className="h-5 opacity-15"
+        />
       </div>
 
       {showPasscodeModal && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[10000] animate-in fade-in duration-200">
-          <div className="rounded-2xl p-8 w-full max-w-sm mx-6 border border-white/10 animate-in zoom-in-95 duration-300" style={{ background: 'linear-gradient(180deg, #293515 0%, #1f2a0f 100%)' }}>
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[10000] animate-in fade-in duration-200">
+          <div
+            className="rounded-2xl p-8 w-full max-w-sm mx-6 backdrop-blur-xl animate-in zoom-in-95 duration-300"
+            style={{
+              background: 'rgba(30,40,15,0.85)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.4)'
+            }}
+          >
             <div className="text-center mb-8">
-              <div className="w-14 h-14 rounded-xl bg-[#CCB8E4]/10 border border-[#CCB8E4]/20 flex items-center justify-center mx-auto mb-4">
-                <Icon name="lock" className="text-3xl text-[#CCB8E4]/70" />
+              <div
+                className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: 'rgba(204,184,228,0.1)', border: '1px solid rgba(204,184,228,0.2)' }}
+              >
+                <Icon name="lock" className="text-3xl" style={{ color: `${ACCENT}B3` }} />
               </div>
               <h2 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'var(--font-headline)' }}>Enter Passcode</h2>
               <p className="text-white/40 text-sm">Staff passcode to exit kiosk mode</p>
@@ -491,7 +649,7 @@ const KioskCheckin: React.FC = () => {
                       ? 'border-red-500 animate-shake'
                       : digit
                         ? 'border-[#CCB8E4]/50'
-                        : 'border-white/20 focus:border-[#CCB8E4]/40'
+                        : 'border-white/15 focus:border-[#CCB8E4]/40'
                   } disabled:opacity-50`}
                   autoComplete="off"
                 />
@@ -506,9 +664,18 @@ const KioskCheckin: React.FC = () => {
 
             {passcodeChecking && (
               <div className="flex justify-center mb-4">
-                <div className="w-6 h-6 rounded-full border-2 border-white/20 border-t-[#CCB8E4] animate-spin" />
+                <div className="w-6 h-6 rounded-full border-2 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
               </div>
             )}
+
+            <button
+              onClick={() => handlePasscodeSubmit(passcodeDigits)}
+              disabled={passcodeChecking || passcodeDigits.some(d => !d)}
+              className="w-full py-3 rounded-xl font-medium text-sm transition-all duration-200 disabled:opacity-30 mb-2"
+              style={{ background: ACCENT, color: '#293515' }}
+            >
+              {passcodeChecking ? 'Verifying...' : 'Submit'}
+            </button>
 
             <button
               onClick={handlePasscodeClose}
@@ -518,6 +685,21 @@ const KioskCheckin: React.FC = () => {
             </button>
           </div>
         </div>
+      )}
+
+      {showPaymentModal && booking && booking.sessionId && (
+        <MemberPaymentModal
+          isOpen={showPaymentModal}
+          bookingId={booking.bookingId}
+          sessionId={booking.sessionId}
+          ownerEmail={booking.ownerEmail}
+          ownerName={booking.ownerName}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            resetToIdle();
+          }}
+          onClose={() => setShowPaymentModal(false)}
+        />
       )}
     </div>
   );

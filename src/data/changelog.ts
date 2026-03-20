@@ -8,6 +8,25 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.91.0",
+    date: "2026-03-20",
+    title: "Kiosk Premium Redesign & Booking Card",
+    isMajor: true,
+    changes: [
+      "Redesigned: Kiosk check-in screen now features a rich radial gradient background with lavender accents for a premium club feel",
+      "New: Success screen shows a personalized time-of-day greeting (Good morning/afternoon/evening) with the member's first name",
+      "New: Tier badge now has a subtle metallic glow effect on the success screen",
+      "New: If you have an upcoming booking today, a glassmorphism card appears after check-in showing your booking details (time, bay, player count)",
+      "New: Pay outstanding booking fees directly from the check-in success screen with the Pay Now button",
+      "Improved: Start Check-In button restyled as an elegant ghost button with spring-physics interaction",
+      "Improved: Passcode modal redesigned with glassmorphism styling, explicit Submit button, and Enter key support",
+      "Improved: Mascot logo now centered in the header; script wordmark logo in the footer",
+      "Fixed: QR scanner now waits for the camera container to be ready before starting, preventing freezes",
+      "Fixed: Camera initialization includes a 10-second timeout with a retry option if it stalls",
+      "Fixed: Walk-in visit times on the member history page now display correctly in Pacific time",
+    ]
+  },
+  {
     version: "8.90.1",
     date: "2026-03-20",
     title: "Stripe Price Sync & Booking Queue Refresh Fixes",

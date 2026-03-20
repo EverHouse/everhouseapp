@@ -76,12 +76,84 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, async (req: Request, res: Resp
       }
     });
 
+    interface UpcomingBookingRow {
+      booking_id: number;
+      session_id: number | null;
+      start_time: string;
+      end_time: string;
+      declared_player_count: number;
+      owner_email: string;
+      resource_name: string;
+      resource_type: string;
+      owner_name: string | null;
+      unpaid_fee_cents: number;
+    }
+
+    let upcomingBooking = null;
+    try {
+      const bookingResult = await db.execute(sql`
+        SELECT 
+          br.id as booking_id,
+          br.session_id,
+          br.start_time::text,
+          br.end_time::text,
+          br.declared_player_count,
+          br.user_email as owner_email,
+          r.name as resource_name,
+          r.type as resource_type,
+          u.name as owner_name,
+          COALESCE(
+            (SELECT SUM(bfs.cached_fee_cents)
+             FROM booking_fee_snapshots bfs
+             WHERE bfs.booking_id = br.id
+               AND bfs.payment_status NOT IN ('paid', 'waived', 'cancelled')),
+            0
+          )::int as unpaid_fee_cents
+        FROM booking_requests br
+        JOIN resources r ON br.resource_id = r.id
+        LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
+        WHERE br.request_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
+          AND br.status IN ('confirmed', 'approved')
+          AND br.start_time >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
+          AND (
+            LOWER(br.user_email) = LOWER(${result.memberEmail})
+            OR br.session_id IN (
+              SELECT bp.session_id FROM booking_participants bp
+              WHERE bp.user_id = ${parseInt(String(member.id), 10) || 0}
+            )
+          )
+        ORDER BY br.start_time ASC
+        LIMIT 1
+      `);
+
+      if (bookingResult.rows.length > 0) {
+        const b = bookingResult.rows[0] as unknown as UpcomingBookingRow;
+        upcomingBooking = {
+          bookingId: Number(b.booking_id),
+          sessionId: b.session_id ? Number(b.session_id) : null,
+          startTime: String(b.start_time),
+          endTime: String(b.end_time),
+          resourceName: String(b.resource_name),
+          resourceType: String(b.resource_type),
+          declaredPlayerCount: Number(b.declared_player_count || 1),
+          ownerEmail: String(b.owner_email),
+          ownerName: String(b.owner_name || ''),
+          unpaidFeeCents: Number(b.unpaid_fee_cents || 0)
+        };
+      }
+    } catch (bookingErr: unknown) {
+      logger.warn('[Kiosk] Failed to fetch upcoming booking for checked-in member', {
+        error: bookingErr instanceof Error ? bookingErr : new Error(getErrorMessage(bookingErr))
+      });
+    }
+
     res.json({
       success: true,
       memberName: result.memberName,
       tier: result.tier,
       lifetimeVisits: result.lifetimeVisits,
-      membershipStatus: result.membershipStatus
+      membershipStatus: result.membershipStatus,
+      upcomingBooking
     });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to process kiosk check-in', error);

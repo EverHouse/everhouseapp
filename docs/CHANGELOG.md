@@ -2,6 +2,27 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.91.0] - 2026-03-20
+
+### Kiosk Premium Redesign & Booking Card
+- **Redesigned**: Full kiosk check-in screen premium overhaul — radial gradient background (lighter forest green center fading to near-black-green edges), lavender (#CCB8E4) accent throughout
+- **New**: Dynamic time-of-day greeting on success screen using Pacific time (`getPacificGreeting()`) — "Good morning, Nick" / "Good afternoon, Nick" / "Good evening, Nick"
+- **New**: Tier badge with subtle metallic outline and soft glow effect
+- **New**: Glassmorphism booking details card on success screen when member has an upcoming booking today — shows resource name, time, player count
+- **New**: Backend `POST /api/kiosk/checkin` now queries `booking_requests` for today's upcoming confirmed/approved bookings and returns `upcomingBooking` object (bookingId, sessionId, startTime, endTime, resourceName, resourceType, declaredPlayerCount, ownerEmail, ownerName, unpaidFeeCents)
+- **New**: Pay Now button on booking card opens `MemberPaymentModal` for outstanding fees
+- **New**: Success screen auto-reset extended to 25s when booking card is shown (vs 5s without); paused while payment modal is open
+- **Improved**: Idle screen — ghost button (transparent bg, lavender border, white text) with `.tactile-btn` spring-physics interaction; ambient radial glow behind QR icon
+- **Improved**: Passcode modal — glassmorphism card (semi-transparent dark bg, backdrop-blur-xl, thin border), lavender accent on focused/filled digit inputs, explicit Submit button instead of auto-submit on 4th digit, Enter key support
+- **Improved**: `handlePasscodeDigitChange` stabilized — uses functional `setPasscodeDigits(prev => ...)` updater removing `passcodeDigits` from dependency array, no longer re-creates on every keystroke
+- **Improved**: `handlePasscodeKeyDown` uses `passcodeDigitsRef` for current value, removing stale closure issue
+- **Improved**: Header — mascot centered horizontally via `justify-center`, exit button absolutely positioned top-right
+- **Improved**: Footer — script wordmark logo image (`/images/everclub-logo-light.webp`, h-5, opacity-15) replaces `<p>` "Ever Club" text
+- **Fixed**: QR scanner freeze — replaced blind `setTimeout(() => startScanner(), 500)` with `requestAnimationFrame` DOM-ready loop that waits for the scanner container element to exist
+- **Fixed**: Camera init timeout — 10s timeout with retry on failure; `handleScan` added to `startScanner` dependency array
+- **Fixed**: Walk-in visit timezone (`server/routes/members/communications.ts`) — `wiv.created_at::date::text` and `TO_CHAR(wiv.created_at, ...)` now use `AT TIME ZONE 'America/Los_Angeles'` for correct Pacific time display on member history page
+- Files changed: `src/pages/Staff/KioskCheckin.tsx`, `server/routes/kioskCheckin.ts`, `server/routes/members/communications.ts`
+
 ## [8.90.1] - 2026-03-20
 
 ### Stripe Price Sync & Booking Queue Refresh Fixes
