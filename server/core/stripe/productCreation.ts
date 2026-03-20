@@ -5,6 +5,7 @@ import { getStripeClient } from './client';
 import { PRICING, getCorporateVolumeTiers, getCorporateBasePrice, updateCorporateVolumePricing, updateOverageRate, updateGuestFee, VolumeTier } from '../billing/pricingConfig';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { logger } from '../logger';
+import { markAppOriginated } from './appOriginTracker';
 
 export async function ensureSimulatorOverageProduct(): Promise<{
   success: boolean;
@@ -236,11 +237,12 @@ export async function ensureGuestPassProduct(): Promise<{
       try {
         const existingProduct = await stripe.products.retrieve(stripeProductId);
         if (existingProduct.name !== GUEST_PASS_NAME) {
+          markAppOriginated(stripeProductId);
           await stripe.products.update(stripeProductId, { name: GUEST_PASS_NAME, description: GUEST_PASS_DESCRIPTION });
           logger.info(`[Guest Pass Product] Renamed Stripe product: ${existingProduct.name} -> ${GUEST_PASS_NAME}`);
         }
       } catch (renameErr: unknown) {
-        logger.warn('[Guest Pass Product] Could not sync Stripe product name', { error: renameErr });
+        logger.warn('[Guest Pass Product] Could not sync Stripe product name', { error: getErrorMessage(renameErr) });
       }
     }
     

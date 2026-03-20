@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.17",
+    date: "2026-03-20",
+    title: "Stripe Sync Hardening: Loop Prevention + Source-of-Truth Safety",
+    changes: [
+      "Security: Tier PUT no longer accepts stripe_product_id or stripe_price_id from the frontend — these are now server-managed only, preventing accidental Stripe linkage corruption",
+      "Fixed: Added markAppOriginated() calls to all remaining Stripe update paths in cafe sync and guest pass product creation — seals webhook echo loops across the entire codebase",
+      "Fixed: Admin pricing endpoints (/api/admin/pricing/guest-fee, /api/admin/pricing/overage-rate) now only update in-memory pricing after Stripe push succeeds, matching the safety pattern already applied to /api/pricing",
+      "Fixed: Removed unused isProduction import from membershipTiers.ts",
+      "Fixed: Standardized error handling in productCreation.ts to use getErrorMessage()",
+    ]
+  },
+  {
     version: "8.94.16",
     date: "2026-03-20",
     title: "Source-of-Truth Hardening: Stripe Sync Safety + Validation",

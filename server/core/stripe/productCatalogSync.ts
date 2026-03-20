@@ -324,10 +324,11 @@ export async function syncCafeItemsToStripe(): Promise<{
               updateParams.active = true;
               logger.warn(`[Cafe Sync] Reactivating archived Stripe product ${stripeProductId} for ${itemName}`);
             }
+            markAppOriginated(stripeProductId);
             await stripe.products.update(stripeProductId, updateParams);
             logger.info(`[Cafe Sync] Updated product for ${itemName}`);
           } catch (prodErr: unknown) {
-            const errMsg = prodErr instanceof Error ? prodErr.message : String(prodErr);
+            const errMsg = getErrorMessage(prodErr);
             if (errMsg.includes('No such product') || errMsg.includes('resource_missing')) {
               logger.warn(`[Cafe Sync] Stored product ${stripeProductId} no longer exists for ${itemName}, will recreate`);
               stripeProductId = null;
@@ -353,6 +354,7 @@ export async function syncCafeItemsToStripe(): Promise<{
               reuseParams.active = true;
               logger.warn(`[Cafe Sync] Reactivating archived Stripe product ${stripeProductId} for ${itemName}`);
             }
+            markAppOriginated(stripeProductId);
             await stripe.products.update(stripeProductId, reuseParams);
             logger.info(`[Cafe Sync] Reusing existing Stripe product ${stripeProductId} for ${itemName}`);
           } else {
@@ -376,6 +378,7 @@ export async function syncCafeItemsToStripe(): Promise<{
               needNewPrice = true;
               logger.warn(`[Cafe Sync] Price ${stripePriceId} for ${itemName} is inactive, will create replacement`);
             } else if (existingPrice.unit_amount !== priceCents) {
+              markAppOriginated(stripePriceId);
               await stripe.prices.update(stripePriceId, { active: false });
               needNewPrice = true;
               logger.info(`[Cafe Sync] Price changed for ${itemName}, creating new price`);
@@ -405,6 +408,7 @@ export async function syncCafeItemsToStripe(): Promise<{
           stripePriceId = newPrice.id;
           logger.info(`[Cafe Sync] Created price for ${itemName}: ${stripePriceId}`);
 
+          markAppOriginated(stripeProductId as string);
           await stripe.products.update(stripeProductId as string, {
             default_price: stripePriceId,
           });

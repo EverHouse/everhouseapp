@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.17] - 2026-03-20
+
+### Stripe Sync Hardening: Loop Prevention + Source-of-Truth Safety
+- **Security**: `PUT /api/membership-tiers/:id` no longer accepts `stripe_product_id` or `stripe_price_id` from the frontend request body. These fields are now server-managed only via `autoPushTierToStripe`. Previously, the frontend could accidentally send `null` for these fields (e.g., before autoPush completed), causing the backend to erase the Stripe linkage and create duplicate Stripe products on the next save.
+- **Fixed**: Added `markAppOriginated()` calls to all remaining Stripe API update paths:
+  - `productCatalogSync.ts`: cafe product updates (existing, reuse, default_price), cafe price archival
+  - `productCreation.ts`: guest pass product rename
+  - These were the last callsites without loop-prevention tagging, meaning their webhook echoes could trigger redundant DB mutations.
+- **Fixed**: Admin pricing endpoints (`/api/admin/pricing/guest-fee`, `/api/admin/pricing/overage-rate`) now only update in-memory pricing config after Stripe push succeeds. Previously they updated in-memory first (optimistic), creating the same source-of-truth drift risk that was fixed in `PUT /api/pricing` in v8.94.16.
+- **Cleanup**: Removed unused `isProduction` import from `membershipTiers.ts`. Standardized error handling in `productCreation.ts` guest pass rename catch to use `getErrorMessage()`.
+- **Scope**: `server/routes/membershipTiers.ts`, `server/core/stripe/productCatalogSync.ts`, `server/core/stripe/productCreation.ts`.
+
 ## [8.94.16] - 2026-03-20
 
 ### Source-of-Truth Hardening: Stripe Sync Safety + Validation

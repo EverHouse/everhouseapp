@@ -1,7 +1,6 @@
 import { logger } from '../core/logger';
 import { Router } from 'express';
 import { z } from 'zod';
-import { isProduction } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
@@ -175,9 +174,12 @@ router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema),
       can_book_wellness, has_group_lessons, has_extended_sessions,
       has_private_lesson, has_simulator_guest_passes, has_discounted_merch,
       unlimited_access,
-      stripe_price_id, stripe_product_id, price_cents,
+      stripe_price_id: _stripe_price_id, stripe_product_id: _stripe_product_id, price_cents,
       wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color
     } = req.body;
+
+    void _stripe_price_id;
+    void _stripe_product_id;
     
     const result = await db.execute(sql`
       UPDATE membership_tiers SET
@@ -205,8 +207,6 @@ router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema),
         has_simulator_guest_passes = COALESCE(${has_simulator_guest_passes}, has_simulator_guest_passes),
         has_discounted_merch = COALESCE(${has_discounted_merch}, has_discounted_merch),
         unlimited_access = COALESCE(${unlimited_access}, unlimited_access),
-        stripe_price_id = COALESCE(${stripe_price_id}, stripe_price_id),
-        stripe_product_id = COALESCE(${stripe_product_id}, stripe_product_id),
         price_cents = COALESCE(${price_cents}, price_cents),
         show_on_membership_page = COALESCE(${show_on_membership_page}, show_on_membership_page),
         wallet_pass_bg_color = CASE WHEN ${wallet_pass_bg_color !== undefined} THEN ${sanitizePassColor(wallet_pass_bg_color)} ELSE wallet_pass_bg_color END,
@@ -378,19 +378,19 @@ const feeUpdateSchema = z.object({
 router.put('/api/admin/pricing/guest-fee', isAdmin, validateBody(feeUpdateSchema), async (req, res) => {
   try {
     const { price_cents } = req.body;
-    updateGuestFee(price_cents);
 
     const pushResult = await autoPushFeeToStripe('guest-pass', price_cents);
-    if (!pushResult.success) {
-      logger.warn('[Admin] Guest fee updated locally but Stripe push failed', { extra: { error: pushResult.error } });
+    if (pushResult.success) {
+      updateGuestFee(price_cents);
+      logFromRequest(req, {
+        action: 'update_guest_fee',
+        resourceType: 'pricing',
+        resourceName: 'Guest Fee',
+        details: { price_cents },
+      });
+    } else {
+      logger.warn('[Admin] Guest fee Stripe push failed — in-memory value NOT updated', { extra: { error: pushResult.error } });
     }
-
-    logFromRequest(req, {
-      action: 'update_guest_fee',
-      resourceType: 'pricing',
-      resourceName: 'Guest Fee',
-      details: { price_cents },
-    });
 
     res.json({ success: true, price_cents, stripe_synced: pushResult.success });
   } catch (error: unknown) {
@@ -402,19 +402,19 @@ router.put('/api/admin/pricing/guest-fee', isAdmin, validateBody(feeUpdateSchema
 router.put('/api/admin/pricing/overage-rate', isAdmin, validateBody(feeUpdateSchema), async (req, res) => {
   try {
     const { price_cents } = req.body;
-    updateOverageRate(price_cents);
 
     const pushResult = await autoPushFeeToStripe('simulator-overage-30min', price_cents);
-    if (!pushResult.success) {
-      logger.warn('[Admin] Overage rate updated locally but Stripe push failed', { extra: { error: pushResult.error } });
+    if (pushResult.success) {
+      updateOverageRate(price_cents);
+      logFromRequest(req, {
+        action: 'update_overage_rate',
+        resourceType: 'pricing',
+        resourceName: 'Overage Rate',
+        details: { price_cents },
+      });
+    } else {
+      logger.warn('[Admin] Overage rate Stripe push failed — in-memory value NOT updated', { extra: { error: pushResult.error } });
     }
-
-    logFromRequest(req, {
-      action: 'update_overage_rate',
-      resourceType: 'pricing',
-      resourceName: 'Overage Rate',
-      details: { price_cents },
-    });
 
     res.json({ success: true, price_cents, stripe_synced: pushResult.success });
   } catch (error: unknown) {
