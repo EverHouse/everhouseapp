@@ -189,8 +189,38 @@ const KioskCheckin: React.FC = () => {
 
     window.addEventListener('popstate', blockBackNavigation);
 
+    const blockBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', blockBeforeUnload);
+
+    const blockKeyboardNav = (e: KeyboardEvent) => {
+      if (
+        (e.metaKey && e.key === 'l') ||
+        (e.metaKey && e.key === '[') ||
+        (e.metaKey && e.key === ']') ||
+        (e.altKey && e.key === 'ArrowLeft') ||
+        (e.altKey && e.key === 'ArrowRight') ||
+        (e.metaKey && e.key === 'r') ||
+        e.key === 'F5'
+      ) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    };
+    window.addEventListener('keydown', blockKeyboardNav, true);
+
+    const blockContextMenu = (e: Event) => {
+      e.preventDefault();
+    };
+    window.addEventListener('contextmenu', blockContextMenu);
+
     return () => {
       window.removeEventListener('popstate', blockBackNavigation);
+      window.removeEventListener('beforeunload', blockBeforeUnload);
+      window.removeEventListener('keydown', blockKeyboardNav, true);
+      window.removeEventListener('contextmenu', blockContextMenu);
       backBlockerRef.current = null;
     };
   }, []);
