@@ -125,7 +125,7 @@ export function useTiersTab() {
             await queryClient.cancelQueries({ queryKey: ['membership-tiers'] });
         },
         onSuccess: () => {
-            showToast(`Tier ${isCreating ? 'created' : 'updated'} successfully`, 'success');
+            showToast(`Tier ${isCreating ? 'created' : 'updated'} — synced to Stripe`, 'success');
             setIsEditing(false);
             setIsCreating(false);
         },

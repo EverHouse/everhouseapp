@@ -180,18 +180,11 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                 <div className="mt-2">
                                     <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3">
                                         Card Features
-                                        {selectedTier?.stripe_product_id ? (
-                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
-                                                <Icon name="cloud" className="text-xs" />
-                                                Managed by Stripe
-                                            </span>
-                                        ) : (
-                                            <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
-                                        )}
+                                        <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
                                     </h4>
                                     {selectedTier?.stripe_product_id ? (
                                         <div>
-                                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">Edit these in Stripe Dashboard → Products → Marketing Features</p>
+                                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">Marketing features synced from Stripe</p>
                                             {(selectedTier?.highlighted_features || []).length > 0 ? (
                                                 <div className="space-y-2">
                                                     {(selectedTier?.highlighted_features || []).map((feature, idx) => (
@@ -240,8 +233,8 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                 </div>
 
                 <div className="border-t-2 border-gray-200 dark:border-white/15 pt-6">
-                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">STRIPE-MANAGED SETTINGS</h4>
-                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-4">These values sync from Stripe. When linked to a Stripe product, edit them in the Stripe Dashboard.</p>
+                    <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-1">STRIPE SETTINGS</h4>
+                    <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-4">Changes saved here sync to Stripe automatically.</p>
                     <div className="space-y-6">
                         <div>
                             <h5 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3">Stripe Pricing</h5>
@@ -318,12 +311,6 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                 <div>
                                     <h5 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3">
                                         Booking Permissions
-                                        {selectedTier?.stripe_product_id && (
-                                            <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 text-[10px] normal-case font-semibold">
-                                                <Icon name="cloud" className="text-xs" />
-                                                From Stripe metadata
-                                            </span>
-                                        )}
                                     </h5>
                                     <div className="space-y-3">
                                         {BOOLEAN_FIELDS.map(field => (

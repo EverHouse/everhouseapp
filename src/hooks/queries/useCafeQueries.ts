@@ -18,6 +18,8 @@ interface CafeMenuResponse {
   image?: string;
   isActive?: boolean;
   is_active?: boolean;
+  synced?: boolean;
+  syncError?: string;
 }
 
 interface ImageUploadResponse {

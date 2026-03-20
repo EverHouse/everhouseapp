@@ -1,12 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { usePageReady } from '../../../stores/pageReadyStore';
 import { useToast } from '../../../components/Toast';
 import ModalShell from '../../../components/ModalShell';
 import { useCafeMenu, useUploadCafeImage, useSeedCafeMenu, useUpdateCafeItem, useDeleteCafeItem } from '../../../hooks/queries/useCafeQueries';
 import type { CafeItem } from '../../../types/data';
-import { postWithCredentials } from '../../../hooks/queries/useFetch';
 import Icon from '../../../components/icons/Icon';
 
 const CafeTab: React.FC = () => {
@@ -15,26 +13,11 @@ const CafeTab: React.FC = () => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [cafeRef] = useAutoAnimate();
 
-    // Queries and mutations
-    const queryClient = useQueryClient();
     const { data: cafeMenu = [] } = useCafeMenu({ includeInactive: true });
     const uploadImageMutation = useUploadCafeImage();
     const seedMenuMutation = useSeedCafeMenu();
     const updateItemMutation = useUpdateCafeItem();
     const deleteItemMutation = useDeleteCafeItem();
-    const pullMutation = useMutation({
-        mutationFn: async () => {
-            return postWithCredentials<{ cafe?: { synced?: number; created?: number; deactivated?: number } }>('/api/admin/stripe/pull-from-stripe', {});
-        },
-        onSuccess: (data: { cafe?: { synced?: number; created?: number; deactivated?: number } }) => {
-            queryClient.invalidateQueries({ queryKey: ['cafe'] });
-            let message = `Pulled from Stripe:\n• ${data.cafe?.synced || 0} cafe items synced`;
-            if ((data.cafe?.created ?? 0) > 0) message += `\n• ${data.cafe?.created} new items created`;
-            if ((data.cafe?.deactivated ?? 0) > 0) message += `\n• ${data.cafe?.deactivated} items deactivated`;
-            showToast(message, 'success');
-        },
-    });
-    const handlePullFromStripe = () => pullMutation.mutate();
 
     // Local state
     const categories = useMemo(() => ['All', ...Array.from(new Set(cafeMenu.map(item => item.category)))], [cafeMenu]);
@@ -91,7 +74,13 @@ const CafeTab: React.FC = () => {
         };
 
         try {
-            await updateItemMutation.mutateAsync(itemData);
+            const result = await updateItemMutation.mutateAsync(itemData);
+            const synced = result?.synced === true;
+            const syncError = result?.syncError;
+            showToast(
+                synced ? 'Item saved — synced to Stripe' : `Item saved — Stripe sync failed${syncError ? `: ${syncError}` : ''}`,
+                synced ? 'success' : 'error'
+            );
             setIsEditing(false);
         } catch (err: unknown) {
             showToast(err instanceof Error ? err.message : 'Failed to save item', 'error');
@@ -118,19 +107,11 @@ const CafeTab: React.FC = () => {
             <div className="flex justify-between items-center mb-4 animate-content-enter-delay-1">
                 <div>
                     <h2 className="text-2xl leading-tight text-primary dark:text-white" style={{ fontFamily: 'var(--font-headline)' }}>Menu Items</h2>
-                    <p className="text-sm text-purple-600 dark:text-purple-400 flex items-center gap-1 mt-0.5" style={{ fontFamily: 'var(--font-body)' }}>
-                        <Icon name="cloud" className="text-xs" />
-                        Prices and items managed in Stripe Dashboard
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-1 mt-0.5" style={{ fontFamily: 'var(--font-body)' }}>
+                        <Icon name="sync" className="text-xs" />
+                        Changes sync to Stripe automatically
                     </p>
                 </div>
-                <button 
-                    onClick={handlePullFromStripe} 
-                    disabled={pullMutation.isPending}
-                    className="tactile-btn flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-[4px] hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                    <Icon name={pullMutation.isPending ? 'progress_activity' : 'cloud_download'} className={`text-sm ${pullMutation.isPending ? 'animate-spin' : ''}`} />
-                    {pullMutation.isPending ? 'Pulling...' : 'Pull from Stripe'}
-                </button>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1 mb-4 animate-content-enter-delay-2 scroll-fade-right">
                 {categories.map(cat => (
@@ -146,16 +127,10 @@ const CafeTab: React.FC = () => {
 
             <ModalShell isOpen={isEditing} onClose={() => { setIsEditing(false); setShowDeleteConfirm(false); }} title={editId ? 'Item Details' : 'Add Item'} showCloseButton={false}>
                 <div className="p-6 space-y-4">
-                    {editId && (
-                        <div className="flex items-center gap-2 p-2.5 rounded-lg bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 text-xs">
-                            <Icon name="info" className="text-sm" />
-                            Names, prices, and categories are managed in Stripe. Description and images can be edited here.
-                        </div>
-                    )}
-                    <input aria-label="Item name" className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} placeholder="Item Name" value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} readOnly={!!editId} />
+                    <input aria-label="Item name" className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" placeholder="Item Name" value={newItem.name || ''} onChange={e => setNewItem({...newItem, name: e.target.value})} />
                     <div className="grid grid-cols-2 gap-3">
-                        <input aria-label="Price" className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} type="number" placeholder="Price" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} readOnly={!!editId} />
-                        <select aria-label="Category" className={`w-full border border-gray-200 dark:border-white/20 ${editId ? 'bg-gray-100 dark:bg-black/50 cursor-not-allowed' : 'bg-gray-50 dark:bg-black/30'} p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast`} value={newItem.category || ''} onChange={e => setNewItem({...newItem, category: e.target.value})} disabled={!!editId}>
+                        <input aria-label="Price" className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white placeholder:text-gray-500 dark:placeholder:text-white/60 focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" type="number" placeholder="Price" value={newItem.price || ''} onChange={e => setNewItem({...newItem, price: Number(e.target.value)})} />
+                        <select aria-label="Category" className="w-full border border-gray-200 dark:border-white/20 bg-gray-50 dark:bg-black/30 p-3.5 rounded-xl text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all duration-fast" value={newItem.category || ''} onChange={e => setNewItem({...newItem, category: e.target.value})}>
                             <option>Coffee & Drinks</option>
                             <option>Breakfast</option>
                             <option>Lunch</option>

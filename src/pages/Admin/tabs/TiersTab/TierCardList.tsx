@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import EmptyState from '../../../../components/EmptyState';
 import FloatingActionButton from '../../../../components/FloatingActionButton';
@@ -27,6 +27,7 @@ const TierCardList: React.FC<TierCardListProps> = ({
     handlePullFromStripe,
 }) => {
     const [tiersRef] = useAutoAnimate();
+    const [showSyncMenu, setShowSyncMenu] = useState(false);
     const subscriptionTiers = tiers.filter(t => t.product_type !== 'one_time');
 
     return (
@@ -46,22 +47,38 @@ const TierCardList: React.FC<TierCardListProps> = ({
                             Stripe {stripeConnection.mode === 'live' ? 'Live' : 'Test'}
                         </span>
                     )}
-                    <button
-                        onClick={handlePullFromStripe}
-                        disabled={pullFromStripePending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/20 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors disabled:opacity-50"
-                    >
-                        <Icon name={pullFromStripePending ? 'progress_activity' : 'cloud_download'} className={`text-sm ${pullFromStripePending ? 'animate-spin' : ''}`} />
-                        {pullFromStripePending ? 'Pulling...' : 'Pull from Stripe'}
-                    </button>
-                    <button
-                        onClick={handleSyncStripe}
-                        disabled={syncStripePending}
-                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-colors disabled:opacity-50"
-                    >
-                        <Icon name={syncStripePending ? 'progress_activity' : 'sync'} className={`text-sm ${syncStripePending ? 'animate-spin' : ''}`} />
-                        {syncStripePending ? 'Syncing...' : 'Sync to Stripe'}
-                    </button>
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSyncMenu(!showSyncMenu)}
+                            className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                            aria-label="Sync options"
+                        >
+                            <Icon name="more_vert" className="text-base" />
+                        </button>
+                        {showSyncMenu && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={() => setShowSyncMenu(false)} />
+                                <div className="absolute right-0 top-full mt-1 z-50 bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/20 rounded-xl shadow-lg py-1 min-w-[180px]">
+                                    <button
+                                        onClick={() => { handlePullFromStripe(); setShowSyncMenu(false); }}
+                                        disabled={pullFromStripePending}
+                                        className="flex items-center gap-2 w-full px-4 py-2.5 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
+                                    >
+                                        <Icon name={pullFromStripePending ? 'progress_activity' : 'cloud_download'} className={`text-sm ${pullFromStripePending ? 'animate-spin' : ''}`} />
+                                        {pullFromStripePending ? 'Pulling...' : 'Force Pull from Stripe'}
+                                    </button>
+                                    <button
+                                        onClick={() => { handleSyncStripe(); setShowSyncMenu(false); }}
+                                        disabled={syncStripePending}
+                                        className="flex items-center gap-2 w-full px-4 py-2.5 text-xs text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors disabled:opacity-50"
+                                    >
+                                        <Icon name={syncStripePending ? 'progress_activity' : 'sync'} className={`text-sm ${syncStripePending ? 'animate-spin' : ''}`} />
+                                        {syncStripePending ? 'Syncing...' : 'Force Sync to Stripe'}
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
             {subscriptionTiers.length === 0 ? (

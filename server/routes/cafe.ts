@@ -138,12 +138,7 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSche
     }
     const { category, name, price, description, icon, image_url, is_active, sort_order } = req.body;
     
-    const existing = await db.select({ 
-        stripeProductId: cafeItems.stripeProductId,
-        name: cafeItems.name,
-        price: cafeItems.price,
-        category: cafeItems.category,
-      })
+    const existing = await db.select({ id: cafeItems.id })
       .from(cafeItems)
       .where(eq(cafeItems.id, numericId));
     if (existing.length === 0) {
@@ -163,22 +158,32 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSche
     
     const updatedItem = result[0];
 
-    autoPushCafeItemToStripe({
-      id: updatedItem.id,
-      name: updatedItem.name,
-      description: updatedItem.description,
-      price: String(updatedItem.price),
-      category: updatedItem.category,
-      stripeProductId: updatedItem.stripeProductId || existing[0].stripeProductId,
-      stripePriceId: updatedItem.stripePriceId,
-    }).catch(err => {
-      logger.error('[AutoPush] Background cafe item push failed', { error: getErrorMessage(err) });
-    });
+    let synced = false;
+    let syncError: string | undefined;
+    try {
+      const pushResult = await autoPushCafeItemToStripe({
+        id: updatedItem.id,
+        name: updatedItem.name,
+        description: updatedItem.description,
+        price: String(updatedItem.price),
+        category: updatedItem.category,
+        stripeProductId: updatedItem.stripeProductId,
+        stripePriceId: updatedItem.stripePriceId,
+      });
+      synced = pushResult.success;
+      if (!pushResult.success) {
+        syncError = pushResult.error || 'Stripe sync failed';
+        logger.error('[AutoPush] Cafe item push failed', { error: syncError });
+      }
+    } catch (err) {
+      syncError = getErrorMessage(err);
+      logger.error('[AutoPush] Cafe item push exception', { error: syncError });
+    }
 
     invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('updated');
     logFromRequest(req, 'update_cafe_item', 'cafe', String(id), name, {});
-    res.json(updatedItem);
+    res.json({ ...updatedItem, synced, syncError });
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item update error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to update cafe item' });
