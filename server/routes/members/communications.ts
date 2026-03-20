@@ -317,7 +317,6 @@ router.get('/api/my-visits', isAuthenticated, validateQuery(optionalEmailQuerySc
           wiv.checked_in_by_name as invited_by
         FROM walk_in_visits wiv
         WHERE LOWER(wiv.member_email) = ${targetEmail}
-          AND wiv.created_at::date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
       ) all_visits
       ORDER BY visit_type, visit_id, date DESC
     `);

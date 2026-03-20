@@ -485,7 +485,6 @@ router.get('/api/member/dashboard/stats', isAuthenticated, async (req, res) => {
           SELECT wiv.id
           FROM walk_in_visits wiv
           WHERE LOWER(wiv.member_email) = ${userEmail}
-            AND wiv.created_at::date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
         ) visits
       `);
       const rows = result.rows as Record<string, unknown>[];
@@ -994,7 +993,6 @@ router.get('/api/member/dashboard-data', isAuthenticated, async (req, res) => {
             SELECT wiv.id
             FROM walk_in_visits wiv
             WHERE LOWER(wiv.member_email) = ${userEmail}
-              AND wiv.created_at::date < (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           ) visits
         `);
         const rows = result.rows as Record<string, unknown>[];
