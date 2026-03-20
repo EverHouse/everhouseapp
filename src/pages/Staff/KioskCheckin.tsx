@@ -38,9 +38,13 @@ interface CheckinResult {
   upcomingBooking?: UpcomingBooking | null;
 }
 
-const ACCENT = '#CCB8E4';
-const BG_GRADIENT = 'radial-gradient(ellipse at 50% 40%, #2f3d1a 0%, #1a220c 60%, #0d1106 100%)';
-const RESET_DELAY_SUCCESS = 5000;
+const OLIVE_ACCENT = '#8B9A6B';
+const OLIVE_TEXT = '#C4CFA6';
+const CREAM = '#E8E4D9';
+const BG_GRADIENT = 'radial-gradient(ellipse at 50% 30%, #2a3518 0%, #1a220c 50%, #0d1106 100%)';
+const CARD_BG = 'rgba(35, 45, 20, 0.6)';
+const CARD_BORDER = 'rgba(139, 154, 107, 0.25)';
+const RESET_DELAY_SUCCESS = 6000;
 const RESET_DELAY_WITH_BOOKING = 25000;
 const RESET_DELAY_ERROR = 3000;
 
@@ -427,10 +431,19 @@ const KioskCheckin: React.FC = () => {
     }
   }, [handlePasscodeSubmit]);
 
+  const currentPacificTime = useMemo(() => {
+    return new Date().toLocaleString('en-US', {
+      timeZone: 'America/Los_Angeles',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: false
+    });
+  }, [state]);
+
   if (!sessionChecked) {
     return (
       <div className="fixed inset-0 flex items-center justify-center" style={{ zIndex: 9999, background: BG_GRADIENT }}>
-        <div className="w-12 h-12 rounded-full border-4 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
+        <div className="w-12 h-12 rounded-full border-4 border-white/20 animate-spin" style={{ borderTopColor: OLIVE_ACCENT }} />
       </div>
     );
   }
@@ -460,72 +473,128 @@ const KioskCheckin: React.FC = () => {
     <div className="fixed inset-0 flex flex-col select-none" style={{ zIndex: 9999, touchAction: 'none', background: BG_GRADIENT }}>
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E")` }} />
 
-      <div className="relative flex items-center justify-center px-6 pt-6 pb-4 flex-shrink-0">
+      <div className="relative flex items-center justify-between px-8 pt-6 pb-4 flex-shrink-0">
         <img
           src="/assets/logos/mascot-white.webp"
           alt="Ever Club"
-          className="h-10 w-auto object-contain opacity-80"
+          className="h-8 w-auto object-contain opacity-60"
         />
         <button
           onClick={handlePasscodeOpen}
-          className="absolute right-6 w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
+          className="w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
           aria-label="Exit kiosk mode"
         >
-          <Icon name="lock_open" className="text-white/20 text-base" />
+          <Icon name="lock_open" className="text-white/15 text-base" />
         </button>
       </div>
 
-      <div className="relative flex-1 flex flex-col items-center justify-center px-6">
+      <div className="relative flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto">
+
         {state === 'idle' && (
-          <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-500 relative">
-            <div
-              className="absolute w-72 h-72 rounded-full pointer-events-none"
-              style={{ background: `radial-gradient(circle, rgba(204,184,228,0.08) 0%, transparent 70%)`, top: '-40px' }}
-            />
+          <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-700 relative">
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-5"
+              style={{ color: OLIVE_ACCENT }}
+            >
+              Arrival Protocol
+            </p>
+
+            <h1
+              className="text-5xl md:text-6xl text-center leading-[1.1] mb-4"
+              style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
+            >
+              Welcome to<br /><em>Ever House</em>
+            </h1>
+
+            <p className="text-white/45 text-base text-center max-w-xs mb-10 leading-relaxed">
+              Please present your digital key or scan the physical portal code.
+            </p>
 
             <div
-              className="relative w-24 h-24 rounded-3xl flex items-center justify-center mx-auto mb-6"
-              style={{ background: `rgba(204,184,228,0.08)`, border: `1px solid rgba(204,184,228,0.25)` }}
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-8"
+              style={{ background: 'rgba(139, 154, 107, 0.12)', border: `1px solid ${CARD_BORDER}`, color: OLIVE_TEXT }}
             >
-              <Icon name="qr_code_scanner" className="text-6xl" style={{ color: ACCENT }} />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Secure Link Active
             </div>
-            <h1 className="text-4xl font-bold text-white tracking-tight mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Self Check-In</h1>
-            <p className="text-white/50 text-lg mb-10 text-center">Tap the button below to scan your membership QR code</p>
+
+            <div className="relative w-72 h-72 flex items-center justify-center mb-10">
+              <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
+
+              <div className="flex flex-col items-center gap-4">
+                <Icon name="qr_code_scanner" className="text-7xl" style={{ color: 'rgba(139, 154, 107, 0.4)' }} />
+                <p
+                  className="text-[10px] tracking-[0.25em] uppercase font-medium"
+                  style={{ color: 'rgba(139, 154, 107, 0.5)' }}
+                >
+                  Aligning Sensors
+                </p>
+              </div>
+            </div>
 
             <button
               onClick={handleStartCheckin}
-              className="tactile-btn group relative px-10 py-5 rounded-2xl text-xl font-semibold transition-all duration-200"
+              className="tactile-btn group relative w-full max-w-xs py-4 rounded-xl text-lg font-semibold transition-all duration-300"
               style={{
-                background: 'transparent',
-                border: `1.5px solid ${ACCENT}`,
-                color: '#fff'
+                background: 'rgba(139, 154, 107, 0.15)',
+                border: `1px solid ${CARD_BORDER}`,
+                color: CREAM
               }}
             >
-              <span className="flex items-center gap-3">
-                <Icon name="photo_camera" className="text-2xl" style={{ color: ACCENT }} />
+              <span className="flex items-center justify-center gap-2">
                 Start Check-In
+                <Icon name="chevron_right" className="text-xl" style={{ color: OLIVE_ACCENT }} />
               </span>
             </button>
           </div>
         )}
 
         {state === 'scanning' && (
-          <div className="w-full max-w-md flex flex-col items-center animate-in fade-in duration-300">
-            <div className="mb-8 text-center">
-              <h1 className="text-3xl font-bold text-white tracking-tight" style={{ fontFamily: 'var(--font-headline)' }}>Welcome</h1>
-              <p className="text-white/50 mt-2 text-lg">Scan your membership QR code to check in</p>
+          <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-300">
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
+              style={{ color: OLIVE_ACCENT }}
+            >
+              Arrival Protocol
+            </p>
+            <h1
+              className="text-4xl md:text-5xl text-center leading-[1.1] mb-3"
+              style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
+            >
+              Present Your Key
+            </h1>
+            <p className="text-white/40 text-sm mb-8 text-center">Hold your membership QR code to the camera</p>
+
+            <div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-6"
+              style={{ background: 'rgba(139, 154, 107, 0.12)', border: `1px solid ${CARD_BORDER}`, color: OLIVE_TEXT }}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Scanner Active
             </div>
 
-            <div className="w-full max-w-sm relative rounded-2xl overflow-hidden bg-black/30 border border-white/10">
-              <div id={elementId} className="w-full" style={{ minHeight: 350 }} />
+            <div className="relative w-full max-w-sm">
+              <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+
+              <div className="rounded-lg overflow-hidden bg-black/40" style={{ border: `1px solid ${CARD_BORDER}` }}>
+                <div id={elementId} className="w-full" style={{ minHeight: 350 }} />
+              </div>
+
               {cameraError && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-6">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/80 rounded-lg p-6">
                   <div className="text-center">
                     <Icon name="photo_camera" className="text-4xl text-red-400 mb-3" />
                     <p className="text-red-300 text-sm">{cameraError}</p>
                     <button
                       onClick={() => startScanner()}
-                      className="mt-4 px-4 py-2 rounded-lg bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
+                      className="mt-4 px-4 py-2 rounded-lg text-white text-sm transition-colors"
+                      style={{ background: 'rgba(139, 154, 107, 0.2)', border: `1px solid ${CARD_BORDER}` }}
                     >
                       Retry
                     </button>
@@ -533,115 +602,208 @@ const KioskCheckin: React.FC = () => {
                 </div>
               )}
             </div>
-
-            <p className="text-white/30 text-xs mt-6">Hold your QR code up to the camera</p>
           </div>
         )}
 
         {state === 'processing' && (
           <div className="text-center animate-in fade-in duration-200">
-            <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center mx-auto mb-6">
-              <div className="w-10 h-10 rounded-full border-4 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-6"
+              style={{ color: OLIVE_ACCENT }}
+            >
+              Verifying Identity
+            </p>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(139, 154, 107, 0.1)', border: `1px solid ${CARD_BORDER}` }}>
+              <div className="w-10 h-10 rounded-full border-3 border-white/15 animate-spin" style={{ borderTopColor: OLIVE_ACCENT }} />
             </div>
-            <h2 className="text-2xl font-bold text-white" style={{ fontFamily: 'var(--font-headline)' }}>Checking you in...</h2>
-            <p className="text-white/40 mt-2">Just a moment</p>
+            <h2 className="text-3xl mb-2" style={{ fontFamily: 'var(--font-headline)', color: CREAM }}>
+              Confirming your arrival...
+            </h2>
+            <p className="text-white/35 text-sm">One moment, please</p>
           </div>
         )}
 
         {state === 'success' && checkinResult && (
-          <div className="text-center animate-in fade-in zoom-in-95 duration-500 w-full max-w-md">
-            <div className="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-6" style={{ background: 'rgba(16,185,129,0.15)' }}>
-              <Icon name="check_circle" className="text-6xl text-emerald-400" />
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>
-              {getPacificGreeting()}, {firstName}
-            </h2>
-            <p className="text-2xl font-semibold" style={{ color: ACCENT }}>{checkinResult.memberName}</p>
-            {checkinResult.tier && (
-              <span
-                className="inline-block mt-3 px-4 py-1.5 rounded-full text-sm font-medium"
-                style={{
-                  background: 'rgba(204,184,228,0.1)',
-                  border: '1px solid rgba(204,184,228,0.3)',
-                  color: ACCENT,
-                  boxShadow: '0 0 12px rgba(204,184,228,0.15)'
-                }}
+          <div className="animate-in fade-in duration-700 w-full max-w-2xl px-2">
+            <div className="mb-8">
+              <p
+                className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
+                style={{ color: OLIVE_ACCENT }}
               >
-                {checkinResult.tier}
-              </span>
-            )}
-            {checkinResult.lifetimeVisits > 0 && (
-              <p className="text-white/40 text-sm mt-3">
-                Visit #{checkinResult.lifetimeVisits}
+                Confirmed Access
               </p>
-            )}
 
-            {booking && (
-              <div
-                className="mt-6 rounded-2xl p-5 text-left backdrop-blur-xl animate-in fade-in slide-in-from-bottom-2 duration-500"
-                style={{
-                  background: 'rgba(255,255,255,0.05)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.2)'
-                }}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Icon name="event" className="text-lg" style={{ color: ACCENT }} />
-                  <span className="text-white/70 text-sm font-medium">Upcoming Booking</span>
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <h2
+                  className="text-4xl md:text-5xl leading-[1.1] max-w-md"
+                  style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
+                >
+                  Welcome home,{' '}<em>{firstName}.</em>{' '}
+                  <span className="text-white/60">Your sanctuary is prepared.</span>
+                </h2>
+
+                <div className="text-right flex-shrink-0 mt-2">
+                  <p className="text-[10px] tracking-[0.2em] uppercase mb-1" style={{ color: OLIVE_ACCENT }}>Arrival Protocol</p>
+                  <p className="text-white font-semibold text-lg">{currentPacificTime} — PT</p>
                 </div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-white font-semibold text-lg">{booking.resourceName}</span>
-                  <span className="text-white/60 text-sm">
-                    {booking.declaredPlayerCount} {booking.declaredPlayerCount === 1 ? 'player' : 'players'}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr] gap-4 mb-6">
+              <div
+                className="rounded-xl p-6 row-span-2"
+                style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-lg font-semibold text-white" style={{ fontFamily: 'var(--font-headline)' }}>Digital Identity</h3>
+                    <p className="text-[10px] tracking-[0.15em] uppercase mt-0.5" style={{ color: 'rgba(255,255,255,0.35)' }}>Non-Transferable Member Pass</p>
+                  </div>
+                  <Icon name="verified" className="text-xl" style={{ color: OLIVE_ACCENT }} />
+                </div>
+
+                <div className="flex items-center justify-between py-4" style={{ borderTop: `1px solid ${CARD_BORDER}`, borderBottom: `1px solid ${CARD_BORDER}` }}>
+                  <div>
+                    <p className="text-[10px] tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Member</p>
+                    <p className="text-white text-lg font-semibold">{checkinResult.memberName}</p>
+                  </div>
+                  <span
+                    className="px-3 py-1 rounded-full text-[10px] font-semibold tracking-wider uppercase"
+                    style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#6ee7b7', border: '1px solid rgba(16, 185, 129, 0.25)' }}
+                  >
+                    Verified
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-white/50 text-sm mb-1">
-                  <Icon name="schedule" className="text-sm" style={{ color: ACCENT }} />
-                  <span>{formatTime12h(booking.startTime)} – {formatTime12h(booking.endTime)}</span>
-                </div>
 
-                {booking.unpaidFeeCents > 0 && booking.sessionId && (
-                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/50 text-sm">
-                        Fees due: <span className="text-white font-medium">${(booking.unpaidFeeCents / 100).toFixed(2)}</span>
-                      </span>
-                      <button
-                        onClick={() => setShowPaymentModal(true)}
-                        className="tactile-btn px-5 py-2 rounded-xl text-sm font-semibold transition-all duration-200"
-                        style={{ background: ACCENT, color: '#293515' }}
-                      >
-                        Pay Now
-                      </button>
+                {checkinResult.tier && (
+                  <div className="flex items-center justify-between pt-4">
+                    <div>
+                      <p className="text-[10px] tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Tier</p>
+                      <p className="text-white font-medium">{checkinResult.tier}</p>
                     </div>
+                    {checkinResult.lifetimeVisits > 0 && (
+                      <div className="text-right">
+                        <p className="text-[10px] tracking-[0.15em] uppercase mb-1" style={{ color: 'rgba(255,255,255,0.35)' }}>Lifetime Visits</p>
+                        <p className="text-white font-medium">{checkinResult.lifetimeVisits}</p>
+                      </div>
+                    )}
                   </div>
                 )}
+              </div>
+
+              {booking ? (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl p-5" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+                      <p className="text-[10px] tracking-[0.15em] uppercase mb-2" style={{ color: OLIVE_ACCENT }}>Session Time</p>
+                      <p className="text-white text-lg font-bold">{formatTime12h(booking.startTime)}</p>
+                      <p className="text-white/40 text-xs mt-0.5">to {formatTime12h(booking.endTime)}</p>
+                    </div>
+                    <div className="rounded-xl p-5" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+                      <p className="text-[10px] tracking-[0.15em] uppercase mb-2" style={{ color: OLIVE_ACCENT }}>Party Size</p>
+                      <p className="text-white text-lg font-bold">
+                        {String(booking.declaredPlayerCount).padStart(2, '0')} {booking.declaredPlayerCount === 1 ? 'Guest' : 'Guests'}
+                      </p>
+                      <p className="text-white/40 text-xs mt-0.5">
+                        {booking.declaredPlayerCount === 1 ? 'Solo session' : 'Member + Companions'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-xl p-5" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+                      <p className="text-[10px] tracking-[0.15em] uppercase mb-2" style={{ color: OLIVE_ACCENT }}>Accommodation</p>
+                      <p className="text-white text-lg font-bold">{booking.resourceName}</p>
+                      <p className="text-white/40 text-xs mt-0.5 capitalize">{booking.resourceType.replace(/_/g, ' ')}</p>
+                    </div>
+                    <div className="rounded-xl p-5" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+                      <p className="text-[10px] tracking-[0.15em] uppercase mb-2" style={{ color: OLIVE_ACCENT }}>Status</p>
+                      {booking.unpaidFeeCents > 0 ? (
+                        <>
+                          <p className="text-amber-300 text-lg font-bold">${(booking.unpaidFeeCents / 100).toFixed(2)}</p>
+                          <p className="text-white/40 text-xs mt-0.5">Fees outstanding</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-emerald-400 text-lg font-bold">Settled</p>
+                          <p className="text-white/40 text-xs mt-0.5">All clear</p>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="rounded-xl p-6 flex items-center gap-4" style={{ background: CARD_BG, border: `1px solid ${CARD_BORDER}` }}>
+                  <Icon name="self_improvement" className="text-3xl" style={{ color: OLIVE_ACCENT }} />
+                  <div>
+                    <p className="text-white font-medium" style={{ fontFamily: 'var(--font-headline)' }}>No upcoming reservations</p>
+                    <p className="text-white/40 text-xs mt-1">Enjoy the house at your leisure. Walk-in visit recorded.</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {booking && booking.unpaidFeeCents > 0 && booking.sessionId && (
+              <div
+                className="rounded-xl p-5 flex items-center justify-between animate-in fade-in slide-in-from-bottom-2 duration-500"
+                style={{ background: 'rgba(139, 154, 107, 0.1)', border: `1px solid ${CARD_BORDER}` }}
+              >
+                <div className="flex items-center gap-3">
+                  <Icon name="payment" className="text-xl" style={{ color: OLIVE_ACCENT }} />
+                  <div>
+                    <p className="text-white font-medium text-sm">Outstanding balance</p>
+                    <p className="text-white/40 text-xs">Settle before your session for seamless entry</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="tactile-btn px-6 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200"
+                  style={{ background: OLIVE_ACCENT, color: '#1a220c' }}
+                >
+                  Pay Now
+                </button>
               </div>
             )}
           </div>
         )}
 
         {state === 'already_checked_in' && checkinResult && (
-          <div className="text-center animate-in fade-in zoom-in-95 duration-500">
-            <div className="w-24 h-24 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto mb-6">
-              <Icon name="check_circle" className="text-6xl text-amber-400" />
-            </div>
-            <h2 className="text-3xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Already Checked In</h2>
+          <div className="text-center animate-in fade-in zoom-in-95 duration-500 max-w-md">
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-6"
+              style={{ color: '#D4A844' }}
+            >
+              Already Registered
+            </p>
+            <h2
+              className="text-4xl mb-3"
+              style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
+            >
+              Welcome back, <em>{firstName}</em>
+            </h2>
             {checkinResult.memberName && (
-              <p className="text-amber-400 text-2xl font-semibold">{checkinResult.memberName}</p>
+              <p className="text-amber-300/80 text-lg mb-4">{checkinResult.memberName}</p>
             )}
-            <p className="text-white/40 text-sm mt-4">You were recently checked in</p>
+            <p className="text-white/35 text-sm">Your arrival was recently noted. No further action required.</p>
           </div>
         )}
 
         {state === 'error' && (
-          <div className="text-center animate-in fade-in zoom-in-95 duration-300">
-            <div className="w-24 h-24 rounded-full bg-red-500/20 flex items-center justify-center mx-auto mb-6">
-              <Icon name="warning" className="text-6xl text-red-400" />
-            </div>
-            <h2 className="text-2xl font-bold text-white mb-2" style={{ fontFamily: 'var(--font-headline)' }}>Check-In Issue</h2>
-            <p className="text-red-300 text-lg">{errorMessage}</p>
-            <p className="text-white/30 text-sm mt-4">Please ask staff for assistance</p>
+          <div className="text-center animate-in fade-in zoom-in-95 duration-300 max-w-md">
+            <p
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-6"
+              style={{ color: '#E57373' }}
+            >
+              Access Issue
+            </p>
+            <h2
+              className="text-3xl mb-3"
+              style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
+            >
+              Unable to verify
+            </h2>
+            <p className="text-red-300/80 text-base mb-6">{errorMessage}</p>
+            <p className="text-white/30 text-sm">Please see the concierge for assistance</p>
           </div>
         )}
       </div>
@@ -650,28 +812,28 @@ const KioskCheckin: React.FC = () => {
         <img
           src="/images/everclub-logo-light.webp"
           alt="Ever Club"
-          className="h-5 opacity-15"
+          className="h-4 opacity-10"
         />
       </div>
 
       {showPasscodeModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-md flex items-center justify-center z-[10000] animate-in fade-in duration-200">
           <div
-            className="rounded-2xl p-8 w-full max-w-sm mx-6 backdrop-blur-xl animate-in zoom-in-95 duration-300"
+            className="rounded-xl p-8 w-full max-w-sm mx-6 backdrop-blur-xl animate-in zoom-in-95 duration-300"
             style={{
-              background: 'rgba(30,40,15,0.85)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              boxShadow: '0 24px 48px rgba(0,0,0,0.4)'
+              background: 'rgba(30,40,15,0.9)',
+              border: `1px solid ${CARD_BORDER}`,
+              boxShadow: '0 24px 48px rgba(0,0,0,0.5)'
             }}
           >
             <div className="text-center mb-8">
               <div
                 className="w-14 h-14 rounded-xl flex items-center justify-center mx-auto mb-4"
-                style={{ background: 'rgba(204,184,228,0.1)', border: '1px solid rgba(204,184,228,0.2)' }}
+                style={{ background: 'rgba(139, 154, 107, 0.1)', border: `1px solid ${CARD_BORDER}` }}
               >
-                <Icon name="lock" className="text-3xl" style={{ color: `${ACCENT}B3` }} />
+                <Icon name="lock" className="text-3xl" style={{ color: OLIVE_ACCENT }} />
               </div>
-              <h2 className="text-xl font-bold text-white mb-1" style={{ fontFamily: 'var(--font-headline)' }}>Enter Passcode</h2>
+              <h2 className="text-xl font-bold mb-1" style={{ fontFamily: 'var(--font-headline)', color: CREAM }}>Enter Passcode</h2>
               <p className="text-white/40 text-sm">Staff passcode to exit kiosk mode</p>
             </div>
 
@@ -692,8 +854,8 @@ const KioskCheckin: React.FC = () => {
                     passcodeError
                       ? 'border-red-500 animate-shake'
                       : digit
-                        ? 'border-[#CCB8E4]/50'
-                        : 'border-white/15 focus:border-[#CCB8E4]/40'
+                        ? 'border-[#8B9A6B]/50'
+                        : 'border-white/15 focus:border-[#8B9A6B]/40'
                   } disabled:opacity-50`}
                   autoComplete="off"
                   style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
@@ -709,7 +871,7 @@ const KioskCheckin: React.FC = () => {
 
             {passcodeChecking && (
               <div className="flex justify-center mb-4">
-                <div className="w-6 h-6 rounded-full border-2 border-white/20 animate-spin" style={{ borderTopColor: ACCENT }} />
+                <div className="w-6 h-6 rounded-full border-2 border-white/20 animate-spin" style={{ borderTopColor: OLIVE_ACCENT }} />
               </div>
             )}
 
@@ -717,7 +879,7 @@ const KioskCheckin: React.FC = () => {
               onClick={() => handlePasscodeSubmit(passcodeDigits)}
               disabled={passcodeChecking || passcodeDigits.some(d => !d)}
               className="w-full py-3 rounded-xl font-medium text-sm transition-all duration-200 disabled:opacity-30 mb-2"
-              style={{ background: ACCENT, color: '#293515' }}
+              style={{ background: OLIVE_ACCENT, color: '#1a220c' }}
             >
               {passcodeChecking ? 'Verifying...' : 'Submit'}
             </button>

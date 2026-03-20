@@ -2,6 +2,22 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.5] - 2026-03-20
+
+### Kiosk Check-In Redesign
+- **Redesigned**: Complete UI overhaul of `KioskCheckin.tsx` to match luxury hospitality aesthetic from reference designs.
+- **Visual**: Replaced purple accent (#CCB8E4) with olive/sage color palette (OLIVE_ACCENT #8B9A6B, OLIVE_TEXT #C4CFA6, CREAM #E8E4D9). Added CARD_BG and CARD_BORDER constants.
+- **Idle state**: Now shows "Arrival Protocol" label, "Welcome to Ever House" serif heading, corner-bracketed QR icon area with "Aligning Sensors" text, "Secure Link Active" badge, and olive-toned "Start Check-In" button.
+- **Scanning state**: Shows "Present Your Key" heading with "Scanner Active" badge and corner-bracketed camera viewport.
+- **Processing state**: Shows "Verifying Identity" label with "Confirming your arrival..." heading.
+- **Success state**: Completely restructured to card-based grid layout — "Confirmed Access" header with "Welcome home, [Name]. Your sanctuary is prepared." heading, current time in PT, "Digital Identity" card with member name/tier/visits/verified badge, and booking detail cards (Session Time, Party Size, Accommodation, Status) when a booking exists. Payment CTA restyled.
+- **Already checked in**: Refined to "Already Registered" / "Welcome back, [Name]" with amber-toned messaging.
+- **Error state**: Refined to "Access Issue" / "Unable to verify" with "Please see the concierge" messaging.
+- **Passcode modal**: Restyled with olive accents matching new palette.
+- **Added**: `currentPacificTime` useMemo for arrival time display.
+- All logic, state management, QR scanning, payment modal, and passcode flows preserved unchanged.
+- Files changed: `src/pages/Staff/KioskCheckin.tsx`
+
 ## [8.94.4] - 2026-03-20
 
 ### Rename Wallet Button to Digital Wallet

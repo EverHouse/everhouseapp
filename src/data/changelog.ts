@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.5",
+    date: "2026-03-20",
+    title: "Kiosk Check-In Redesign",
+    changes: [
+      "Redesigned: The self check-in kiosk screen now features a luxury hospitality aesthetic with elegant serif typography, olive/sage tones, and refined 'Arrival Protocol' language",
+      "Redesigned: The check-in confirmation screen now displays your membership details in a structured card layout with your digital identity, session time, accommodation, party size, and status",
+      "Improved: The QR scanner area now features elegant corner bracket decorations and a 'Secure Link Active' status indicator",
+      "Improved: Error and already-checked-in states now use refined messaging that matches the luxury design language",
+    ]
+  },
+  {
     version: "8.94.4",
     date: "2026-03-20",
     title: "Rename Wallet Button to Digital Wallet",
