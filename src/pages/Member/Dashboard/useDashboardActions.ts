@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { fetchWithCredentials, putWithCredentials, deleteWithCredentials } from '../../../hooks/queries/useFetch';
 import { apiRequestBlob } from '../../../lib/apiRequest';
@@ -146,12 +146,6 @@ export function useDashboardActions({ user, isAdminViewingAs, refetchAllData }: 
     });
   };
 
-  const isAppleDevice = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    const ua = navigator.userAgent;
-    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }, []);
-
   const handleDownloadBookingWalletPass = async (bookingId: number) => {
     setWalletPassDownloading(bookingId);
     try {
@@ -165,7 +159,7 @@ export function useDashboardActions({ user, isAdminViewingAs, refetchAllData }: 
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('Wallet pass downloaded — open it to add to Apple Wallet', 'success', 5000);
+      showToast('Wallet pass downloaded — open it to add to your digital wallet', 'success', 5000);
     } catch {
       showToast('Failed to download booking wallet pass', 'error');
     } finally {
@@ -178,7 +172,6 @@ export function useDashboardActions({ user, isAdminViewingAs, refetchAllData }: 
     confirmModal, setConfirmModal,
     optimisticCancelledIds,
     walletPassDownloading,
-    isAppleDevice,
     handleCancelBooking,
     handleLeaveBooking,
     handleCancelRSVP,

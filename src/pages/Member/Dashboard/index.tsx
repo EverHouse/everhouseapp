@@ -63,8 +63,6 @@ const Dashboard: React.FC = () => {
     nextWellnessClass,
     upcomingItemsFiltered,
 
-    isAppleDevice,
-
     refetchAllData,
     handleCancelBooking,
     handleLeaveBooking,
@@ -174,7 +172,6 @@ const Dashboard: React.FC = () => {
             upcomingItemsFiltered={upcomingItemsFiltered}
             isStaffOrAdminProfile={isStaffOrAdminProfile}
             walletPassAvailable={walletPassAvailable}
-            isAppleDevice={isAppleDevice}
             walletPassDownloading={walletPassDownloading}
             rsvpSectionError={rsvpSectionError}
             wellnessSectionError={wellnessSectionError}

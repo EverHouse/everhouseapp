@@ -586,12 +586,6 @@ export function useDashboardData() {
     });
   };
 
-  const isAppleDevice = useMemo(() => {
-    if (typeof navigator === 'undefined') return false;
-    const ua = navigator.userAgent;
-    return /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-  }, []);
-
   const handleDownloadBookingWalletPass = async (bookingId: number) => {
     setWalletPassDownloading(bookingId);
     try {
@@ -605,7 +599,7 @@ export function useDashboardData() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showToast('Wallet pass downloaded — open it to add to Apple Wallet', 'success', 5000);
+      showToast('Wallet pass downloaded — open it to add to your digital wallet', 'success', 5000);
     } catch {
       showToast('Failed to download booking wallet pass', 'error');
     } finally {
@@ -653,8 +647,6 @@ export function useDashboardData() {
     nextEvent,
     nextWellnessClass,
     upcomingItemsFiltered,
-
-    isAppleDevice,
 
     refetchAllData,
     handleCancelBooking,

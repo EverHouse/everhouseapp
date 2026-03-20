@@ -12,7 +12,6 @@ interface ScheduleSectionProps {
   upcomingItemsFiltered: ScheduleItem[];
   isStaffOrAdminProfile: boolean;
   walletPassAvailable: boolean;
-  isAppleDevice: boolean;
   walletPassDownloading: number | null;
   rsvpSectionError: boolean | null | undefined;
   wellnessSectionError: boolean | null | undefined;
@@ -28,7 +27,7 @@ interface ScheduleSectionProps {
 }
 
 export const ScheduleSection: React.FC<ScheduleSectionProps> = ({
-  isDark, upcomingItemsFiltered, isStaffOrAdminProfile, walletPassAvailable, isAppleDevice,
+  isDark, upcomingItemsFiltered, isStaffOrAdminProfile, walletPassAvailable,
   walletPassDownloading, rsvpSectionError, wellnessSectionError,
   startNavigation, navigate, refetchAllData,
   handleCancelBooking, handleLeaveBooking, handleCancelRSVP, handleCancelWellness,
@@ -56,7 +55,6 @@ export const ScheduleSection: React.FC<ScheduleSectionProps> = ({
             isDark={isDark}
             isStaffOrAdminProfile={isStaffOrAdminProfile}
             walletPassAvailable={walletPassAvailable}
-            isAppleDevice={isAppleDevice}
             walletPassDownloading={walletPassDownloading}
             refetchAllData={refetchAllData}
             handleCancelBooking={handleCancelBooking}
@@ -91,7 +89,6 @@ interface ScheduleItemRowProps {
   isDark: boolean;
   isStaffOrAdminProfile: boolean;
   walletPassAvailable: boolean;
-  isAppleDevice: boolean;
   walletPassDownloading: number | null;
   refetchAllData: () => void;
   handleCancelBooking: (id: number, type: 'booking' | 'booking_request') => void;
@@ -102,7 +99,7 @@ interface ScheduleItemRowProps {
 }
 
 const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
-  item, idx, isDark, isStaffOrAdminProfile, walletPassAvailable, isAppleDevice,
+  item, idx, isDark, isStaffOrAdminProfile, walletPassAvailable,
   walletPassDownloading, refetchAllData,
   handleCancelBooking, handleLeaveBooking, handleCancelRSVP, handleCancelWellness,
   handleDownloadBookingWalletPass,
@@ -124,7 +121,7 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
       ? createPacificDate(item.rawDate, startTime24) <= new Date()
       : false;
 
-    const isWalletEligible = walletPassAvailable && isAppleDevice && ['approved', 'confirmed', 'attended', 'checked_in'].includes(bookingStatus);
+    const isWalletEligible = walletPassAvailable && ['approved', 'confirmed', 'attended', 'checked_in'].includes(bookingStatus);
 
     if (isCancellationPending) {
       actions = [];
@@ -132,7 +129,7 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
       actions = [
         ...(isWalletEligible ? [{
           icon: walletPassDownloading === Number(item.dbId) ? 'progress_activity' : 'wallet',
-          label: 'Add to Apple Wallet',
+          label: 'Add to Digital Wallet',
           onClick: () => handleDownloadBookingWalletPass(Number(item.dbId)),
           disabled: walletPassDownloading === Number(item.dbId)
         }] : []),
@@ -195,11 +192,11 @@ const ScheduleItemRow: React.FC<ScheduleItemRowProps> = ({
   } else if (item.type === 'conference_room_calendar') {
     const confCalRaw = item.raw as DashboardBookingItem;
     const confCalStatus = confCalRaw.status || '';
-    const confCalWalletEligible = walletPassAvailable && isAppleDevice && ['approved', 'confirmed', 'attended', 'checked_in'].includes(confCalStatus);
+    const confCalWalletEligible = walletPassAvailable && ['approved', 'confirmed', 'attended', 'checked_in'].includes(confCalStatus);
     actions = [
       ...(confCalWalletEligible && typeof item.dbId === 'number' ? [{
         icon: walletPassDownloading === item.dbId ? 'progress_activity' : 'wallet',
-        label: 'Add to Apple Wallet',
+        label: 'Add to Digital Wallet',
         onClick: () => handleDownloadBookingWalletPass(item.dbId as number),
         disabled: walletPassDownloading === item.dbId
       }] : []),

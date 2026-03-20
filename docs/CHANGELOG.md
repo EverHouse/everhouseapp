@@ -2,6 +2,17 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.4] - 2026-03-20
+
+### Rename Wallet Button to Digital Wallet
+- **Changed**: All user-facing "Add to Apple Wallet" button text renamed to "Add to Digital Wallet" across MembershipCard modal, ScheduleSection actions, and ExistingBookings buttons.
+- **Changed**: Apple logo SVG replaced with generic Material Symbols `wallet` icon in MembershipCard and ExistingBookings wallet buttons.
+- **Changed**: Toast messages after wallet pass download updated from "Apple Wallet" to "digital wallet" in MembershipCard, useDashboardData, useDashboardActions, and ExistingBookings.
+- **Changed**: Removed `isAppleDevice` gate from wallet button eligibility in ScheduleSection so Android/non-Apple users can also see and download the `.pkpass` file. The `walletPassAvailable` admin setting check is preserved.
+- **Changed**: All wallet button `aria-label` attributes updated to "Add to Digital Wallet".
+- **Cleanup**: Removed `isAppleDevice` prop from `ScheduleSectionProps`, `ScheduleItemRowProps`, and the Dashboard index. Removed the `isAppleDevice` `useMemo` from `useDashboardData.ts`.
+- Files changed: `src/pages/Member/Dashboard/MembershipCard.tsx`, `src/pages/Member/Dashboard/ScheduleSection.tsx`, `src/pages/Member/Dashboard/useDashboardData.ts`, `src/pages/Member/Dashboard/useDashboardActions.ts`, `src/pages/Member/Dashboard/index.tsx`, `src/pages/Member/BookGolf/ExistingBookings.tsx`
+
 ## [8.94.3] - 2026-03-20
 
 ### Tab Switch Glitch Fixes

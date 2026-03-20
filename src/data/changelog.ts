@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.4",
+    date: "2026-03-20",
+    title: "Rename Wallet Button to Digital Wallet",
+    changes: [
+      "Changed: 'Add to Apple Wallet' buttons now read 'Add to Digital Wallet' across the membership card, booking schedule, and existing bookings views",
+      "Changed: Apple logo icon replaced with a generic wallet icon on all wallet buttons",
+      "Changed: Toast messages after wallet pass download now say 'digital wallet' instead of 'Apple Wallet'",
+      "Changed: Android and other non-Apple users can now see and use the wallet pass download button on their schedule — previously it was hidden for non-Apple devices",
+      "Updated: All wallet button aria-labels updated to 'Add to Digital Wallet' for accessibility",
+    ]
+  },
+  {
     version: "8.94.3",
     date: "2026-03-20",
     title: "Tab Switch Glitch Fixes",
