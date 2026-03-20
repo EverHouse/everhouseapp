@@ -175,6 +175,26 @@ const KioskCheckin: React.FC = () => {
     };
   }, [stopScanner]);
 
+  const backBlockerRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    const blockBackNavigation = () => {
+      window.history.pushState(null, '', '/kiosk');
+    };
+
+    backBlockerRef.current = blockBackNavigation;
+
+    window.history.replaceState(null, '', '/kiosk');
+    window.history.pushState(null, '', '/kiosk');
+
+    window.addEventListener('popstate', blockBackNavigation);
+
+    return () => {
+      window.removeEventListener('popstate', blockBackNavigation);
+      backBlockerRef.current = null;
+    };
+  }, []);
+
   const handleStartCheckin = useCallback(() => {
     setState('scanning');
     setTimeout(() => startScanner(), 500);
@@ -211,6 +231,10 @@ const KioskCheckin: React.FC = () => {
 
       const data = await res.json();
       if (data.valid) {
+        if (backBlockerRef.current) {
+          window.removeEventListener('popstate', backBlockerRef.current);
+          backBlockerRef.current = null;
+        }
         await stopScanner();
         navigate('/admin', { replace: true });
       } else {
