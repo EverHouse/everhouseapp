@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.92.0",
+    date: "2026-03-20",
+    title: "Animation & Interaction Polish",
+    changes: [
+      "Improved: Loading screens now show a branded skeleton instead of a blank white screen while checking your session",
+      "Improved: Apply for Membership, Book a Tour, and Private Event Inquiry pages now have smooth staggered entry animations matching the rest of the app",
+      "Improved: Success screens on form submissions now animate in smoothly",
+      "Improved: Back buttons on form pages now have tactile press feedback",
+      "Improved: Settings save confirmations now use the standard notification toast instead of a custom banner",
+    ]
+  },
+  {
     version: "8.91.0",
     date: "2026-03-20",
     title: "Kiosk Premium Redesign & Booking Card",

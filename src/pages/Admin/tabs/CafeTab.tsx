@@ -259,8 +259,8 @@ const CafeTab: React.FC = () => {
                             </div>
                         )}
                         <div className="flex gap-3 ml-auto">
-                            <button onClick={() => { setIsEditing(false); setShowDeleteConfirm(false); }} className="px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-[4px] transition-colors">Cancel</button>
-                            <button onClick={handleSave} disabled={isLoading} className="px-6 py-2.5 bg-primary text-white rounded-[4px] font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50">Save</button>
+                            <button onClick={() => { setIsEditing(false); setShowDeleteConfirm(false); }} className="tactile-btn px-5 py-2.5 text-gray-500 dark:text-white/80 font-bold hover:bg-gray-100 dark:hover:bg-white/10 rounded-[4px] transition-colors">Cancel</button>
+                            <button onClick={handleSave} disabled={isLoading} className="tactile-btn px-6 py-2.5 bg-primary text-white rounded-[4px] font-bold shadow-md hover:bg-primary/90 transition-colors disabled:opacity-50">Save</button>
                         </div>
                     </div>
                 </div>

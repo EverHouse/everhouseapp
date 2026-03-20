@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.92.0] - 2026-03-20
+
+### Animation & Interaction Polish
+- **Improved**: Auth guard routes (`ProtectedRoute`, `MemberPortalRoute`, `AdminProtectedRoute`) now render `<PageSkeleton>` instead of blank `<div className="min-h-screen" />` while `sessionChecked` is false
+- **Improved**: `MembershipApply.tsx` — added `animate-page-enter` to wrapper, `animate-content-enter` to back link, `animate-content-enter-delay-1` to heading, `animate-content-enter-delay-2` to form card, `animate-content-enter` to success card; `tactile-btn` on back link
+- **Improved**: `PrivateHireInquire.tsx` — same stagger pattern as MembershipApply
+- **Improved**: `BookTour.tsx` — same stagger pattern; `tactile-btn` on back link; success card gets `animate-content-enter`
+- **Improved**: `BugReportsAdmin.tsx` — added `animate-page-enter` to top-level wrapper for consistency with other admin pages
+- **Improved**: `CafeTab.tsx` — Save and Cancel buttons upgraded with `tactile-btn` for press feedback
+- **Improved**: `SettingsTab.tsx` — replaced custom `success` state + inline green banner + `setTimeout` pattern with standard `useToast('Settings saved successfully', 'success')` for consistency; wallet-pass push errors now also show toast
+- Files changed: `src/App.tsx`, `src/pages/Public/MembershipApply.tsx`, `src/pages/Public/PrivateHireInquire.tsx`, `src/pages/Public/BookTour.tsx`, `src/pages/Admin/BugReportsAdmin.tsx`, `src/pages/Admin/tabs/CafeTab.tsx`, `src/pages/Admin/tabs/SettingsTab.tsx`
+
 ## [8.91.0] - 2026-03-20
 
 ### Kiosk Premium Redesign & Booking Card

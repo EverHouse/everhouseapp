@@ -173,16 +173,16 @@ const BookTour: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414]">
+    <div className="min-h-screen pb-0 overflow-x-hidden relative bg-bone dark:bg-[#141414] animate-page-enter">
       <SEO
         title="Book a Tour | Ever Club — Golf & Social Club, OC"
         description="Schedule a free 30-min tour of Ever Club in Tustin. See Trackman simulators, coworking, café & wellness at OC's top private club."
         url="/tour"
       />
-      <div className="pt-4 px-4 pb-4">
+      <div className="pt-4 px-4 pb-4 animate-content-enter">
         <Link
           to="/"
-          className="inline-flex items-center gap-1 text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors py-2"
+          className="tactile-btn inline-flex items-center gap-1 text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white transition-colors py-2"
         >
           <Icon name="arrow_back" className="text-lg" />
           <span className="text-sm font-medium">Back</span>
@@ -191,7 +191,7 @@ const BookTour: React.FC = () => {
 
       <div className="px-4 pb-12">
         <div className="max-w-xl mx-auto">
-          <div className="text-center mb-8">
+          <div className="text-center mb-8 animate-content-enter-delay-1">
             <h1 className="text-3xl sm:text-4xl md:text-5xl text-primary dark:text-white mb-3 leading-none" style={{ fontFamily: 'var(--font-display)' }}>
               Book Your Private Tour
             </h1>
@@ -216,7 +216,7 @@ const BookTour: React.FC = () => {
           </div>
 
           {step === 3 && bookingResult ? (
-            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-8 text-center">
+            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] p-8 text-center animate-content-enter">
               <div className="w-20 h-20 bg-green-100 dark:bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Icon name="check_circle" className="text-4xl text-green-600 dark:text-green-400" />
               </div>
@@ -263,7 +263,7 @@ const BookTour: React.FC = () => {
               </Link>
             </div>
           ) : (
-            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden">
+            <div className="bg-white/60 dark:bg-white/5 backdrop-blur-xl rounded-xl border border-white/80 dark:border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.08)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden animate-content-enter-delay-2">
               <div className="flex items-center justify-center gap-3 py-6 border-b border-primary/10 dark:border-white/10">
                 <div className="flex flex-col items-center gap-1">
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-fast ${step === 1 ? 'bg-primary text-white' : step > 1 ? 'bg-green-500 text-white' : 'bg-primary/10 dark:bg-white/10 text-primary dark:text-white'}`}>

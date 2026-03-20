@@ -299,7 +299,7 @@ const ScrollToTop = () => {
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, sessionChecked } = useAuthData();
-  if (!sessionChecked) return <div className="min-h-screen" />;
+  if (!sessionChecked) return <PageSkeleton />;
   if (!user) return <Navigate to="/login" replace />;
   return <>{children}</>;
 };
@@ -372,7 +372,7 @@ const WaiverGate: React.FC = () => {
 // Members Portal route guard - redirects staff/admin to Staff Portal (unless viewing as member or on profile page)
 const MemberPortalRoute: React.FC<{ children: React.ReactNode; allowStaffAccess?: boolean }> = ({ children, allowStaffAccess }) => {
   const { user, actualUser, isViewingAs, sessionChecked } = useAuthData();
-  if (!sessionChecked) return <div className="min-h-screen" />;
+  if (!sessionChecked) return <PageSkeleton />;
   if (!user) return <Navigate to="/login" replace />;
   
   const isStaffOrAdmin = actualUser?.role === 'admin' || actualUser?.role === 'staff';
@@ -385,8 +385,7 @@ const MemberPortalRoute: React.FC<{ children: React.ReactNode; allowStaffAccess?
 
 const AdminProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { actualUser, sessionChecked } = useAuthData();
-  // Only block rendering until initial session check completes
-  if (!sessionChecked) return <div className="min-h-screen" />;
+  if (!sessionChecked) return <PageSkeleton />;
   if (!actualUser) return <Navigate to="/login" replace />;
   if (actualUser.role !== 'admin' && actualUser.role !== 'staff') return <Navigate to="/dashboard" replace />;
   return <>{children}</>;

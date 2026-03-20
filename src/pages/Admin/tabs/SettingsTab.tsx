@@ -5,6 +5,7 @@ import { copyToClipboard } from '../../../lib/copyToClipboard';
 import Toggle from '../../../components/Toggle';
 import WalkingGolferSpinner from '../../../components/WalkingGolferSpinner';
 import Icon from '../../../components/icons/Icon';
+import { useToast } from '../../../components/Toast';
 
 interface SettingsState {
   dataIntegrityAlerts: boolean;
@@ -132,7 +133,7 @@ const SubSectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) 
 
 const SettingsTab: React.FC = () => {
   const queryClient = useQueryClient();
-  const [success, setSuccess] = useState<string | null>(null);
+  const { showToast } = useToast();
   const [hasChanges, setHasChanges] = useState(false);
   const [copied, setCopied] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -334,8 +335,7 @@ const SettingsTab: React.FC = () => {
     },
     onSuccess: () => {
       setHasChanges(false);
-      setSuccess('Settings saved successfully');
-      setTimeout(() => setSuccess(null), 3000);
+      showToast('Settings saved successfully', 'success');
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['settings'] });
@@ -371,13 +371,6 @@ const SettingsTab: React.FC = () => {
 
   return (
     <div className="animate-page-enter space-y-6 pb-32 backdrop-blur-sm">
-      {success && (
-        <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 rounded-lg text-green-700 dark:text-green-400 text-sm flex items-center gap-2 animate-content-enter">
-          <Icon name="check_circle" className="text-lg" />
-          {success}
-        </div>
-      )}
-
       {errorMessage && (
         <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700 rounded-lg text-red-700 dark:text-red-400 text-sm flex items-center gap-2 animate-content-enter">
           <Icon name="error" className="text-lg" />
@@ -531,10 +524,9 @@ const SettingsTab: React.FC = () => {
                     try {
                       const res = await postWithCredentials('/api/admin/wallet-pass/push-update-all', {});
                       const data = res as { sent?: number; failed?: number };
-                      setSuccess(`Push sent to ${data.sent ?? 0} device(s)${data.failed ? `, ${data.failed} failed` : ''}`);
-                      setTimeout(() => setSuccess(null), 4000);
+                      showToast(`Push sent to ${data.sent ?? 0} device(s)${data.failed ? `, ${data.failed} failed` : ''}`, 'success');
                     } catch {
-                      setSuccess(null);
+                      showToast('Failed to send push update', 'error');
                     }
                   }}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary/90 rounded-lg transition-colors"
