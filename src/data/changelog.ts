@@ -8,6 +8,16 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.13",
+    date: "2026-03-20",
+    title: "Editable Card Marketing Features",
+    changes: [
+      "Fixed: Card marketing features on the tier editor are now fully editable — you can add, edit, and remove features directly in the app, and they sync to Stripe as marketing features when saved (previously these were read-only when a tier was linked to Stripe)",
+      "Improved: Features are now free-text fields instead of checkboxes — you can type any description you want, not just pick from the tier privileges list",
+      "Fixed: Empty feature entries are automatically stripped when saving, so accidental blanks don't push to Stripe",
+    ]
+  },
+  {
     version: "8.94.12",
     date: "2026-03-20",
     title: "Stripe Sync Reliability & Cafe Item Creation",

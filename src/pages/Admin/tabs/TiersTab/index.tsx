@@ -69,7 +69,6 @@ const TiersTab: React.FC = () => {
                     setNewFeatureForm={tab.setNewFeatureForm}
                     isReordering={tab.isReordering}
                     handleReorderFeature={tab.handleReorderFeature}
-                    handleHighlightToggle={tab.handleHighlightToggle}
                     debouncedUpdateFeatureValue={tab.debouncedUpdateFeatureValue}
                     updateFeatureValueMutation={tab.updateFeatureValueMutation}
                     updateFeatureLabelMutation={tab.updateFeatureLabelMutation}

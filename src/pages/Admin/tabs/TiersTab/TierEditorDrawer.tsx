@@ -28,7 +28,6 @@ interface TierEditorDrawerProps {
     setNewFeatureForm: (v: { key: string; label: string; type: 'boolean' | 'number' | 'text' }) => void;
     isReordering: boolean;
     handleReorderFeature: (featureId: number, direction: 'up' | 'down') => void;
-    handleHighlightToggle: (feature: string) => void;
     debouncedUpdateFeatureValue: (featureId: number, tierId: number, value: string | boolean | number) => void;
     updateFeatureValueMutation: { isPending: boolean };
     updateFeatureLabelMutation: { mutate: (v: { featureId: number; displayLabel: string }) => void };
@@ -57,7 +56,6 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
     setNewFeatureForm,
     isReordering,
     handleReorderFeature,
-    handleHighlightToggle,
     debouncedUpdateFeatureValue,
     updateFeatureValueMutation,
     updateFeatureLabelMutation,
@@ -180,52 +178,58 @@ const TierEditorDrawer: React.FC<TierEditorDrawerProps> = ({
                                 <div className="mt-2">
                                     <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gray-500 dark:text-gray-400 mb-3">
                                         Card Features
-                                        <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/4)</span>
+                                        <span className="ml-2 font-normal text-gray-400">({(selectedTier?.highlighted_features || []).length}/15)</span>
                                     </h4>
-                                    {selectedTier?.stripe_product_id ? (
-                                        <div>
-                                            <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">Marketing features synced from Stripe</p>
-                                            {(selectedTier?.highlighted_features || []).length > 0 ? (
-                                                <div className="space-y-2">
-                                                    {(selectedTier?.highlighted_features || []).map((feature, idx) => (
-                                                        <div key={idx} className="flex items-center gap-2 p-2.5 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25">
-                                                            <Icon name="check_circle" className="text-sm text-green-600 dark:text-green-400" />
-                                                            <span className="text-sm text-primary dark:text-white">{feature}</span>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <p className="text-xs text-gray-400 dark:text-gray-500 italic">No marketing features configured in Stripe</p>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                                                Select up to 4 features to highlight on the pricing card
-                                            </p>
-                                            <div className="space-y-2">
-                                                {BOOLEAN_FIELDS.filter(f => (selectedTier as unknown as Record<string, boolean | string | number | null | undefined>)?.[f.key]).map(field => (
-                                                    <label 
-                                                        key={field.key}
-                                                        className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${
-                                                            (selectedTier?.highlighted_features || []).includes(field.label)
-                                                                ? 'bg-primary/10 dark:bg-primary/20 border border-primary/30'
-                                                                : 'bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 hover:bg-gray-100 dark:hover:bg-black/30'
-                                                        }`}
+                                    <div>
+                                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-3">
+                                            {selectedTier?.stripe_product_id ? 'Synced to Stripe as marketing features' : 'Displayed on the pricing card'}
+                                        </p>
+                                        <div className="space-y-2">
+                                            {(selectedTier?.highlighted_features || []).map((feature, idx) => (
+                                                <div key={idx} className="flex items-center gap-2">
+                                                    <Icon name="check_circle" className="text-sm text-green-600 dark:text-green-400 flex-shrink-0" />
+                                                    <input
+                                                        type="text"
+                                                        value={feature}
+                                                        onChange={(e) => {
+                                                            if (!selectedTier) return;
+                                                            const updated = [...(selectedTier.highlighted_features || [])];
+                                                            updated[idx] = e.target.value;
+                                                            setSelectedTier({ ...selectedTier, highlighted_features: updated });
+                                                        }}
+                                                        className="flex-1 px-2.5 py-2 rounded-xl bg-gray-50 dark:bg-black/20 border border-gray-200 dark:border-white/25 text-sm text-primary dark:text-white focus:ring-2 focus:ring-primary focus:border-transparent outline-none transition-all"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (!selectedTier) return;
+                                                            const updated = (selectedTier.highlighted_features || []).filter((_, i) => i !== idx);
+                                                            setSelectedTier({ ...selectedTier, highlighted_features: updated });
+                                                        }}
+                                                        className="w-7 h-7 flex items-center justify-center rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors flex-shrink-0"
                                                     >
-                                                        <input
-                                                            type="checkbox"
-                                                            checked={(selectedTier?.highlighted_features || []).includes(field.label)}
-                                                            onChange={() => handleHighlightToggle(field.label)}
-                                                            disabled={(selectedTier?.highlighted_features || []).length >= 4 && !(selectedTier?.highlighted_features || []).includes(field.label)}
-                                                            className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                                        />
-                                                        <span className="text-sm text-primary dark:text-white">{field.label}</span>
-                                                    </label>
-                                                ))}
-                                            </div>
+                                                        <Icon name="close" className="text-sm" />
+                                                    </button>
+                                                </div>
+                                            ))}
                                         </div>
-                                    )}
+                                        {(selectedTier?.highlighted_features || []).length < 15 && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    if (!selectedTier) return;
+                                                    setSelectedTier({
+                                                        ...selectedTier,
+                                                        highlighted_features: [...(selectedTier.highlighted_features || []), '']
+                                                    });
+                                                }}
+                                                className="mt-2 flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
+                                            >
+                                                <Icon name="add" className="text-sm" />
+                                                Add feature
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             </>
                         )}

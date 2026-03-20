@@ -2,6 +2,15 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.13] - 2026-03-20
+
+### Editable Card Marketing Features
+- **Fixed**: Card marketing features on the tier editor are now fully editable — admins can add, edit, and remove features directly in the app. Previously, once a tier was linked to Stripe (which all real tiers are), the features section became read-only with the message "Marketing features synced from Stripe."
+- **Improved**: Features are now free-text input fields instead of checkboxes tied to boolean privilege labels. This means admins can type any description (e.g., "90 min Daily Golf", "Priority Booking (14 days)") instead of being limited to the names of enabled tier privileges.
+- **Fixed**: Empty feature entries are automatically stripped out before saving, preventing blank marketing features from being pushed to Stripe.
+- **Technical**: The save handler (`handleSave` in `useTiersTab.ts`) now filters `highlighted_features` to remove empty/whitespace-only strings before mutation. The existing `autoPushTierToStripe` engine already maps `highlighted_features` → Stripe `marketing_features`, so no backend changes were needed.
+- **Scope**: `src/pages/Admin/tabs/TiersTab/TierEditorDrawer.tsx`, `src/pages/Admin/tabs/TiersTab/useTiersTab.ts`.
+
 ## [8.94.12] - 2026-03-20
 
 ### Stripe Sync Reliability & Cafe Item Creation

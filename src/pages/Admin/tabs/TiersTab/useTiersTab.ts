@@ -334,7 +334,11 @@ export function useTiersTab() {
     const handleSave = async () => {
         if (!selectedTier) return;
         setError(null);
-        saveTierMutation.mutate({ tier: selectedTier, isNew: isCreating });
+        const cleanedTier = {
+            ...selectedTier,
+            highlighted_features: (selectedTier.highlighted_features || []).filter(f => f.trim() !== '')
+        };
+        saveTierMutation.mutate({ tier: cleanedTier, isNew: isCreating });
     };
 
     const handleHighlightToggle = (feature: string) => {
