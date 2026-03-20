@@ -13,13 +13,16 @@ export const TransitionContext = createContext<TransitionCustom>(defaultCustom);
 // eslint-disable-next-line react-refresh/only-export-components
 export const useTransitionState = () => useContext(TransitionContext);
 
+const supportsViewTransitions = typeof document !== 'undefined' &&
+  'startViewTransition' in document;
+
 interface DirectionalPageTransitionProps {
   children: React.ReactNode;
 }
 
 const DirectionalPageTransition: React.FC<DirectionalPageTransitionProps> = ({ children }) => {
   return (
-    <div className="page-fade-in" style={{ minHeight: '100%' }}>
+    <div className={supportsViewTransitions ? undefined : 'page-fade-in'} style={{ minHeight: '100%' }}>
       {children}
     </div>
   );

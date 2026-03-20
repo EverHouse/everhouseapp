@@ -85,7 +85,7 @@ const InitialLoadingScreen: React.FC<{ children: React.ReactNode }> = ({ childre
 };
 
 const PageSkeleton: React.FC = () => (
-  <div className="px-6 pt-4 animate-pulse">
+  <div className="px-6 pt-4 animate-pulse min-h-screen bg-[#F2F2EC] dark:bg-[#293515]">
     <div className="h-8 w-48 bg-white/10 rounded-lg mb-2" />
     <div className="h-4 w-32 bg-white/5 rounded mb-6" />
     <div className="space-y-4">
@@ -422,11 +422,20 @@ const useViewTransitionLocation = () => {
       const doc = document as Document & {
         startViewTransition: (cb: () => void) => { finished: Promise<void> };
       };
-      doc.startViewTransition(() => {
-        flushSync(() => {
-          setDisplayLocation(location);
+      document.documentElement.classList.add('vt-navigating');
+      try {
+        const transition = doc.startViewTransition(() => {
+          flushSync(() => {
+            setDisplayLocation(location);
+          });
         });
-      });
+        transition.finished.finally(() => {
+          document.documentElement.classList.remove('vt-navigating');
+        });
+      } catch {
+        document.documentElement.classList.remove('vt-navigating');
+        setDisplayLocation(location);
+      }
     } else {
       setDisplayLocation(location);
     }
