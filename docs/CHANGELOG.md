@@ -9,8 +9,10 @@ All notable changes to the Ever Club Members App are documented here.
 - **Fixed**: Duplicate Stripe prices created across days due to stale idempotency keys — keys are now unique per sync attempt
 - **Fixed**: Booking queue items (cancellation-pending bookings) were not disappearing from admin list after Trackman webhook confirmation — cancellation events now trigger immediate data refresh instead of being delayed by debounce
 - **Fixed**: Staff dashboard real-time connection reconnection now refreshes all booking data automatically (previously missed events during disconnection were permanently lost)
+- **Fixed**: Day Pass (Coworking and Golf Sim) products were not checking if their Stripe price was still active — if deactivated externally, billing would silently fail; now detects and recreates
+- **Fixed**: Group add-on (family billing) products had the same inactive-price blindspot — now validates and replaces inactive or missing prices during sync
 - **Fixed**: 7 duplicate icon entries in icon registry causing build warnings
-- **Key files**: `server/core/stripe/productSync.ts`, `server/core/stripe/productCreation.ts`, `src/hooks/useStaffWebSocket.ts`, `src/components/icons/iconPaths.ts`
+- **Key files**: `server/core/stripe/productSync.ts`, `server/core/stripe/productCreation.ts`, `server/core/stripe/productCatalogSync.ts`, `server/core/stripe/groupBillingCrud.ts`, `src/hooks/useStaffWebSocket.ts`, `src/components/icons/iconPaths.ts`
 
 ## [8.89.2] - 2026-03-19
 

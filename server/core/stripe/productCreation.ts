@@ -368,6 +368,24 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
         logger.info(`[Day Pass Coworking Product] Fixed productType to one_time`);
       }
     }
+
+    if (stripePriceId) {
+      try {
+        const existingPrice = await stripe.prices.retrieve(stripePriceId);
+        if (!existingPrice.active) {
+          logger.warn(`[Day Pass Coworking Product] Stored Stripe price ${stripePriceId} is inactive, will recreate`);
+          stripePriceId = null;
+        }
+      } catch (priceErr: unknown) {
+        const errMsg = getErrorMessage(priceErr);
+        if (errMsg.includes('No such price') || errMsg.includes('resource_missing')) {
+          logger.warn(`[Day Pass Coworking Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
+          stripePriceId = null;
+        } else {
+          logger.warn(`[Day Pass Coworking Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+        }
+      }
+    }
     
     if (!stripeProductId) {
       const product = await stripe.products.create({
@@ -481,6 +499,24 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
           .set({ productType: 'one_time' })
           .where(eq(membershipTiers.id, tierId));
         logger.info(`[Day Pass Golf Sim Product] Fixed productType to one_time`);
+      }
+    }
+
+    if (stripePriceId) {
+      try {
+        const existingPrice = await stripe.prices.retrieve(stripePriceId);
+        if (!existingPrice.active) {
+          logger.warn(`[Day Pass Golf Sim Product] Stored Stripe price ${stripePriceId} is inactive, will recreate`);
+          stripePriceId = null;
+        }
+      } catch (priceErr: unknown) {
+        const errMsg = getErrorMessage(priceErr);
+        if (errMsg.includes('No such price') || errMsg.includes('resource_missing')) {
+          logger.warn(`[Day Pass Golf Sim Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
+          stripePriceId = null;
+        } else {
+          logger.warn(`[Day Pass Golf Sim Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+        }
       }
     }
     

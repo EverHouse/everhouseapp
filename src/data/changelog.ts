@@ -16,6 +16,8 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Duplicate Stripe prices were being created across days because old idempotency keys were being reused — keys are now unique per sync attempt",
       "Fixed: Booking queue items (like cancellation-pending bookings) were not disappearing from the admin list after Trackman webhook confirmation — cancellation events now trigger an immediate data refresh instead of being delayed by the debounce timer",
       "Fixed: If the staff dashboard's real-time connection dropped and reconnected, any booking changes that happened during the gap were permanently missed — reconnection now automatically refreshes all booking data",
+      "Fixed: Day Pass (Coworking and Golf Sim) products were not checking if their Stripe price was still active — if a price was deactivated externally, billing would silently fail; now detects and recreates like the other product types",
+      "Fixed: Group add-on (family billing) products had the same inactive-price blindspot — now validates and replaces inactive or missing prices during sync",
       "Fixed: 7 duplicate icon entries in the icon registry were causing build warnings",
     ]
   },

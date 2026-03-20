@@ -121,6 +121,22 @@ export async function syncGroupAddOnProductsToStripe(): Promise<{
           stripeProductId = stripeProduct.id;
         }
         
+        if (stripePriceId) {
+          try {
+            const existingPrice = await stripe.prices.retrieve(stripePriceId);
+            if (!existingPrice.active) {
+              logger.warn(`[Group Billing] Price ${stripePriceId} for ${product.tierName} is inactive, will recreate`);
+              stripePriceId = null;
+            }
+          } catch (priceErr: unknown) {
+            const errMsg = getErrorMessage(priceErr);
+            if (errMsg.includes('No such price') || errMsg.includes('resource_missing')) {
+              logger.warn(`[Group Billing] Price ${stripePriceId} for ${product.tierName} not found, will recreate`);
+              stripePriceId = null;
+            }
+          }
+        }
+
         if (!stripePriceId) {
           const interval = (product.billingInterval || 'month') as 'month' | 'year';
           const stripePrice = await stripe.prices.create({
@@ -134,7 +150,7 @@ export async function syncGroupAddOnProductsToStripe(): Promise<{
               group_addon: 'true',
               tier_name: product.tierName,
             },
-          }, { idempotencyKey: `price_${stripeProductId}_${product.priceCents}_${interval}` });
+          }, { idempotencyKey: `price_${stripeProductId}_${product.priceCents}_${interval}_${Date.now()}` });
           stripePriceId = stripePrice.id;
         }
         
