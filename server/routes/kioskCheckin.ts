@@ -4,6 +4,7 @@ import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
 import { processWalkInCheckin } from '../core/walkInCheckinService';
+import { checkinBooking } from '../core/bookingService/approvalCheckin';
 import { logFromRequest } from '../core/auditLog';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
@@ -31,57 +32,30 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
     const { memberId } = req.body;
 
     const memberResult = await db.execute(sql`
-      SELECT id, membership_status FROM users WHERE id = ${memberId} LIMIT 1
+      SELECT id, email, first_name, last_name, membership_status, tier, lifetime_visits
+      FROM users WHERE id = ${memberId} LIMIT 1
     `);
 
     if (memberResult.rows.length === 0) {
       return res.status(404).json({ error: 'Member not found. Please ask staff for help.' });
     }
 
-    const member = memberResult.rows[0] as { id: number | string; membership_status: string | null };
+    const member = memberResult.rows[0] as {
+      id: string;
+      email: string;
+      first_name: string | null;
+      last_name: string | null;
+      membership_status: string | null;
+      tier: string | null;
+      lifetime_visits: number | null;
+    };
+    const memberEmail = member.email;
+    const memberName = [member.first_name, member.last_name].filter(Boolean).join(' ') || memberEmail?.split('@')[0] || '';
     const status = String(member.membership_status || '').toLowerCase();
     const blockedStatuses = ['cancelled', 'suspended', 'terminated', 'inactive', 'archived'];
     if (blockedStatuses.includes(status)) {
       return res.status(403).json({ error: 'Membership is not active. Please speak to staff.' });
     }
-
-    const result = await processWalkInCheckin({
-      memberId: String(member.id),
-      checkedInBy: `kiosk:${sessionUser.email}`,
-      checkedInByName: 'Kiosk Self-Service',
-      source: 'kiosk'
-    });
-
-    if (result.alreadyCheckedIn) {
-      return res.status(409).json({
-        error: 'Already checked in',
-        alreadyCheckedIn: true,
-        memberName: result.memberName,
-        tier: result.tier
-      });
-    }
-
-    if (!result.success) {
-      return res.status(500).json({ error: result.error });
-    }
-
-    logFromRequest(req, 'kiosk_checkin', 'member', String(member.id), result.memberName, {
-      memberEmail: result.memberEmail,
-      tier: result.tier,
-      lifetimeVisits: result.lifetimeVisits,
-      type: 'walk_in',
-      source: 'kiosk_qr',
-      staffEmail: sessionUser.email
-    });
-
-    logger.info('[Kiosk] Self-service check-in via kiosk QR scan', {
-      extra: {
-        memberEmail: result.memberEmail,
-        memberName: result.memberName,
-        lifetimeVisits: result.lifetimeVisits,
-        staffEmail: sessionUser.email
-      }
-    });
 
     interface UpcomingBookingRow {
       booking_id: number;
@@ -96,7 +70,7 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
       unpaid_fee_cents: number;
     }
 
-    let upcomingBooking = null;
+    let upcomingBooking: UpcomingBookingRow | null = null;
     try {
       const bookingResult = await db.execute(sql`
         SELECT 
@@ -108,7 +82,11 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
           br.user_email as owner_email,
           r.name as resource_name,
           r.type as resource_type,
-          u.name as owner_name,
+          COALESCE(
+            NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''),
+            br.user_name,
+            br.user_email
+          ) as owner_name,
           COALESCE(
             (SELECT SUM(bfs.cached_fee_cents)
              FROM booking_fee_snapshots bfs
@@ -121,9 +99,10 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
         LEFT JOIN users u ON LOWER(u.email) = LOWER(br.user_email)
         WHERE br.request_date = (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::date
           AND br.status IN ('confirmed', 'approved')
-          AND br.start_time >= (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
+          AND br.end_time > (CURRENT_TIMESTAMP AT TIME ZONE 'America/Los_Angeles')::time
           AND (
-            LOWER(br.user_email) = LOWER(${result.memberEmail})
+            LOWER(br.user_email) = LOWER(${memberEmail})
+            OR br.user_id = ${String(member.id)}
             OR br.session_id IN (
               SELECT bp.session_id FROM booking_participants bp
               WHERE bp.user_id = ${String(member.id)}
@@ -134,33 +113,126 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
       `);
 
       if (bookingResult.rows.length > 0) {
-        const b = bookingResult.rows[0] as unknown as UpcomingBookingRow;
-        upcomingBooking = {
-          bookingId: Number(b.booking_id),
-          sessionId: b.session_id ? Number(b.session_id) : null,
-          startTime: String(b.start_time),
-          endTime: String(b.end_time),
-          resourceName: String(b.resource_name),
-          resourceType: String(b.resource_type),
-          declaredPlayerCount: Number(b.declared_player_count || 1),
-          ownerEmail: String(b.owner_email),
-          ownerName: String(b.owner_name || ''),
-          unpaidFeeCents: Number(b.unpaid_fee_cents || 0)
-        };
+        upcomingBooking = bookingResult.rows[0] as unknown as UpcomingBookingRow;
       }
     } catch (bookingErr: unknown) {
-      logger.warn('[Kiosk] Failed to fetch upcoming booking for checked-in member', {
+      logger.warn('[Kiosk] Failed to fetch upcoming booking for member', {
         error: bookingErr instanceof Error ? bookingErr : new Error(getErrorMessage(bookingErr))
       });
     }
 
+    if (upcomingBooking) {
+      const bookingId = Number(upcomingBooking.booking_id);
+
+      const checkinResult = await checkinBooking({
+        bookingId,
+        targetStatus: 'attended',
+        skipPaymentCheck: true,
+        skipRosterCheck: true,
+        staffEmail: `kiosk:${sessionUser.email}`,
+        staffName: 'Kiosk Self-Service',
+      });
+
+      if (checkinResult.alreadyProcessed) {
+        return res.status(409).json({
+          error: 'Already checked in',
+          alreadyCheckedIn: true,
+          memberName,
+          tier: member.tier
+        });
+      }
+
+      if (checkinResult.error && !checkinResult.success) {
+        logger.warn('[Kiosk] Booking check-in failed, falling back to walk-in', {
+          extra: { bookingId, error: checkinResult.error, memberId: member.id }
+        });
+      } else {
+        const freshVisits = await db.execute(sql`
+          SELECT lifetime_visits FROM users WHERE id = ${member.id} LIMIT 1
+        `);
+        const lifetimeVisits = (freshVisits.rows[0] as { lifetime_visits: number | null })?.lifetime_visits || (member.lifetime_visits || 0);
+
+        logFromRequest(req, 'kiosk_checkin', 'member', String(member.id), memberName, {
+          memberEmail,
+          tier: member.tier,
+          lifetimeVisits,
+          type: 'booking',
+          bookingId,
+          source: 'kiosk_qr',
+          staffEmail: sessionUser.email
+        });
+
+        logger.info('[Kiosk] Booking check-in via kiosk QR scan', {
+          extra: { memberEmail, memberName, bookingId, lifetimeVisits, staffEmail: sessionUser.email }
+        });
+
+        return res.json({
+          success: true,
+          memberName,
+          tier: member.tier,
+          lifetimeVisits,
+          membershipStatus: member.membership_status,
+          upcomingBooking: {
+            bookingId,
+            sessionId: upcomingBooking.session_id ? Number(upcomingBooking.session_id) : null,
+            startTime: String(upcomingBooking.start_time),
+            endTime: String(upcomingBooking.end_time),
+            resourceName: String(upcomingBooking.resource_name),
+            resourceType: String(upcomingBooking.resource_type),
+            declaredPlayerCount: Number(upcomingBooking.declared_player_count || 1),
+            ownerEmail: String(upcomingBooking.owner_email),
+            ownerName: String(upcomingBooking.owner_name || ''),
+            unpaidFeeCents: Number(upcomingBooking.unpaid_fee_cents || 0)
+          }
+        });
+      }
+    }
+
+    const walkInResult = await processWalkInCheckin({
+      memberId: String(member.id),
+      checkedInBy: `kiosk:${sessionUser.email}`,
+      checkedInByName: 'Kiosk Self-Service',
+      source: 'kiosk'
+    });
+
+    if (walkInResult.alreadyCheckedIn) {
+      return res.status(409).json({
+        error: 'Already checked in',
+        alreadyCheckedIn: true,
+        memberName: walkInResult.memberName,
+        tier: walkInResult.tier
+      });
+    }
+
+    if (!walkInResult.success) {
+      return res.status(500).json({ error: walkInResult.error });
+    }
+
+    logFromRequest(req, 'kiosk_checkin', 'member', String(member.id), walkInResult.memberName, {
+      memberEmail: walkInResult.memberEmail,
+      tier: walkInResult.tier,
+      lifetimeVisits: walkInResult.lifetimeVisits,
+      type: 'walk_in',
+      source: 'kiosk_qr',
+      staffEmail: sessionUser.email
+    });
+
+    logger.info('[Kiosk] Walk-in check-in via kiosk QR scan', {
+      extra: {
+        memberEmail: walkInResult.memberEmail,
+        memberName: walkInResult.memberName,
+        lifetimeVisits: walkInResult.lifetimeVisits,
+        staffEmail: sessionUser.email
+      }
+    });
+
     res.json({
       success: true,
-      memberName: result.memberName,
-      tier: result.tier,
-      lifetimeVisits: result.lifetimeVisits,
-      membershipStatus: result.membershipStatus,
-      upcomingBooking
+      memberName: walkInResult.memberName,
+      tier: walkInResult.tier,
+      lifetimeVisits: walkInResult.lifetimeVisits,
+      membershipStatus: walkInResult.membershipStatus,
+      upcomingBooking: null
     });
   } catch (error: unknown) {
     logAndRespond(req, res, 500, 'Failed to process kiosk check-in', error);
