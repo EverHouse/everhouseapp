@@ -175,6 +175,10 @@
   }
 }
 
+html {
+  scroll-padding-top: var(--header-offset, 96px);
+}
+
 :root {
   /* Header Offset - centralized calculation for header height + safe area */
   --header-height: 80px;
@@ -2845,6 +2849,10 @@ html.dark .border-accessible {
 .tactile-row:active,
 .tactile-btn:active {
   transform: scale(var(--tap-scale));
+}
+
+.accordion-item-wrapper {
+  scroll-margin-top: var(--header-offset, 96px);
 }
 
 /* Accordion height animation using grid technique */

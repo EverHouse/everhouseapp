@@ -705,7 +705,7 @@ const ClassCard: React.FC<ClassCardProps> = React.memo(({ title, date, time, ins
 
   return (
   <div 
-    className={`rounded-xl relative overflow-hidden transition-all duration-fast glass-card p-0 ${isDark ? 'border-white/25' : 'border-black/10'} ${isPending ? 'ring-2 ring-offset-2 ring-offset-transparent animate-pulse' : ''} ${isCancelling ? 'ring-red-500/50' : isRsvping ? (showJoinWaitlist ? 'ring-amber-500/50' : 'ring-green-500/50') : ''}`}
+    className={`accordion-item-wrapper rounded-xl relative overflow-hidden transition-all duration-fast glass-card p-0 ${isDark ? 'border-white/25' : 'border-black/10'} ${isPending ? 'ring-2 ring-offset-2 ring-offset-transparent animate-pulse' : ''} ${isCancelling ? 'ring-red-500/50' : isRsvping ? (showJoinWaitlist ? 'ring-amber-500/50' : 'ring-green-500/50') : ''}`}
   >
     <button 
       onClick={onToggle}

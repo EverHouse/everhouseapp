@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Footer } from '../../components/Footer';
 import PageLoadingSpinner from '../../components/PageLoadingSpinner';
 import EmptyState from '../../components/EmptyState';
@@ -145,11 +145,22 @@ const FAQ: React.FC = () => {
 
 const AccordionItem: React.FC<{ question: string; answer: string }> = ({ question, answer }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const itemRef = useRef<HTMLDivElement>(null);
+
+  const handleToggle = () => {
+    const willOpen = !isOpen;
+    setIsOpen(willOpen);
+    if (willOpen && itemRef.current) {
+      requestAnimationFrame(() => {
+        itemRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  };
 
   return (
-    <div className="tactile-row border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl" style={{ borderRadius: '12px' }}>
+    <div ref={itemRef} className="accordion-item-wrapper border border-primary/10 dark:border-white/10 rounded-xl overflow-hidden bg-white/40 dark:bg-white/5 backdrop-blur-xl" style={{ borderRadius: '12px' }}>
       <button 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={handleToggle}
         className="w-full flex items-center justify-between p-4 text-left font-bold text-primary dark:text-white hover:bg-primary/5 dark:hover:bg-white/5 transition-colors"
       >
         <span>{question}</span>

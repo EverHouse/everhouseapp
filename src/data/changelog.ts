@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.2",
+    date: "2026-03-20",
+    title: "Page Scroll & Accordion UX Fixes",
+    changes: [
+      "Fixed: Navigating between pages now reliably scrolls to the top — the scroll fires after the page transition finishes, not during the exit animation",
+      "Fixed: Opening an accordion item on FAQ, Cafe, What's On, Events, and Wellness pages now auto-scrolls the item into view below the header",
+      "Fixed: Accordion items no longer get hidden behind the fixed header when scrolled to — all pages now account for the header height",
+      "Fixed: Touching the screen to scroll on mobile no longer triggers a false button-press animation on accordion items in FAQ, Cafe, and training guides",
+    ]
+  },
+  {
     version: "8.94.1",
     date: "2026-03-20",
     title: "Bug Fixes & Input Validation Hardening",

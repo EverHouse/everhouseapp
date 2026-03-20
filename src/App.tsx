@@ -279,21 +279,6 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-const ScrollToTop = () => {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    if ('scrollRestoration' in history) {
-      history.scrollRestoration = 'manual';
-    }
-  }, []);
-  
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, [pathname]);
-  
-  return null;
-};
 
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -456,6 +441,18 @@ const AnimatedRoutes: React.FC = () => {
   const prevPathRef = useRef(location.pathname);
   const { user } = useAuthData();
   const prevEmailRef = useRef(user?.email);
+
+  useEffect(() => {
+    if ('scrollRestoration' in history) {
+      history.scrollRestoration = 'manual';
+    }
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }, [displayLocation.pathname]);
   
   useEffect(() => {
     if (prevEmailRef.current && prevEmailRef.current !== user?.email) {
@@ -947,7 +944,6 @@ const App: React.FC = () => {
               <BrowserRouter>
                 <OfflineBanner />
                 <UpdateNotification />
-                <ScrollToTop />
                 <Layout>
                   <AnimatedRoutes />
                 </Layout>

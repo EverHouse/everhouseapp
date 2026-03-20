@@ -27,6 +27,15 @@ const PublicCafe: React.FC = () => {
   const [cafeMenu, setCafeMenu] = useState<CafeItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const expandedRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (expandedItemId && expandedRef.current) {
+      requestAnimationFrame(() => {
+        expandedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [expandedItemId]);
 
   const categories = useMemo(() => Array.from(new Set(cafeMenu.map(item => item.category))), [cafeMenu]);
   const [activeCategory, setActiveCategory] = useState('');
@@ -144,14 +153,15 @@ const PublicCafe: React.FC = () => {
                 return (
                   <div
                     key={item.id}
-                    className={`bg-white dark:bg-[#1a1d15] rounded-xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
+                    ref={isExpanded ? expandedRef : undefined}
+                    className={`accordion-item-wrapper bg-white dark:bg-[#1a1d15] rounded-xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
                   >
                     <div
                       onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedItemId(isExpanded ? null : item.id); } }}
-                      className={`tactile-row flex justify-between items-center group p-3 cursor-pointer transition-all duration-fast ${isExpanded ? '' : 'active:scale-[0.98]'}`}
+                      className={`flex justify-between items-center group p-3 cursor-pointer transition-all duration-fast hover:bg-primary/5 dark:hover:bg-white/5`}
                     >
                       <div className="flex gap-4 flex-1 items-center">
                         <div className="w-14 h-14 flex-shrink-0 rounded-lg flex items-center justify-center overflow-hidden relative bg-[#EAEBE6] dark:bg-white/5 text-primary/40 dark:text-white/40">

@@ -243,7 +243,7 @@ export const NoticeList: React.FC<NoticeListProps> = ({
             )}
 
             {pastClosures.length > 0 && (
-                <div className="mt-6 bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden">
+                <div className="mt-6 accordion-item-wrapper bg-white/60 dark:bg-white/5 backdrop-blur-sm border border-white/80 dark:border-white/10 rounded-xl overflow-hidden">
                     <button
                         onClick={() => setShowPastAccordion(!showPastAccordion)}
                         className="w-full flex items-center justify-between p-4 hover:bg-gray-50/50 dark:hover:bg-white/5 transition-colors"

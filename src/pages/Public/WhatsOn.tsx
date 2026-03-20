@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Footer } from '../../components/Footer';
 import { BookingCardSkeleton, SkeletonList } from '../../components/skeletons';
@@ -53,6 +53,15 @@ const WhatsOn: React.FC = () => {
   const [wellnessClasses, setWellnessClasses] = useState<WellnessClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const expandedRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (expandedId && expandedRef.current) {
+      requestAnimationFrame(() => {
+        expandedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [expandedId]);
   const [filter, setFilter] = useState<'all' | 'events' | 'wellness'>('all');
   const [displayCount, setDisplayCount] = useState(ITEMS_PER_PAGE);
 
@@ -205,15 +214,16 @@ const WhatsOn: React.FC = () => {
 
             return (
               <div 
-                key={itemId} 
-                className={`tactile-card bg-white dark:bg-[#1a1d15] rounded-xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
+                key={itemId}
+                ref={isExpanded ? expandedRef : undefined}
+                className={`accordion-item-wrapper bg-white dark:bg-[#1a1d15] rounded-xl overflow-hidden shadow-layered dark:shadow-black/20 transition-all duration-fast animate-list-item-delay-${Math.min(index, 10)}`}
               >
                 <div 
                   onClick={() => setExpandedId(isExpanded ? null : itemId)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedId(isExpanded ? null : itemId); } }}
-                  className={`flex gap-4 p-4 cursor-pointer transition-all duration-fast ${isExpanded ? '' : 'active:scale-[0.98]'}`}
+                  className={`flex gap-4 p-4 cursor-pointer transition-all duration-fast hover:bg-primary/5 dark:hover:bg-white/5`}
                 >
                   <div className="w-14 h-14 flex-shrink-0 flex flex-col items-center justify-center rounded-xl bg-[#EAEBE6] dark:bg-white/5 text-primary dark:text-white">
                     <span className="text-[10px] font-bold uppercase tracking-wider opacity-60">{date.month}</span>

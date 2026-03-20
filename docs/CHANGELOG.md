@@ -2,6 +2,15 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.2] - 2026-03-20
+
+### Page Scroll & Accordion UX Fixes
+- **Fixed**: Page navigation scroll-to-top now fires after the page transition animation completes (after `displayLocation` updates), not during the exit animation. Previously, the scroll would fire immediately on pathname change while the old page was still visible, causing the scroll reset to get lost.
+- **Fixed**: Opening an accordion item on FAQ, Cafe, What's On, Events, and Wellness pages now auto-scrolls the expanded item into view with smooth scrolling, ensuring the content is visible after expanding.
+- **Fixed**: Added global `scroll-padding-top` using the `--header-offset` CSS variable so that scroll-to-element operations (including `scrollIntoView`) account for the fixed header height. Accordion items use `scroll-margin-top` to clear the header.
+- **Fixed**: Removed `tactile-row` press animation from accordion items on FAQ, Cafe, and training guide (ContextualHelp) pages. The `:active` scale transform was triggering on touch-scroll, making it feel like buttons were being pressed when the user was just scrolling.
+- Files changed: `src/App.tsx`, `src/index.css`, `src/pages/Public/FAQ.tsx`, `src/pages/Public/Cafe.tsx`, `src/pages/Public/WhatsOn.tsx`, `src/pages/Member/Events.tsx`, `src/pages/Member/Wellness.tsx`, `src/components/ContextualHelp.tsx`, `src/pages/Admin/tabs/BlocksTab/NoticeList.tsx`
+
 ## [8.94.1] - 2026-03-20
 
 ### Bug Fixes & Input Validation Hardening

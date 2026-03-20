@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { SlideUpDrawer } from './SlideUpDrawer';
 import WalkingGolferSpinner from './WalkingGolferSpinner';
 import { fetchWithCredentials } from '../hooks/queries/useFetch';
@@ -27,6 +27,15 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
   const [sections, setSections] = useState<TrainingSectionDB[]>([]);
   const [loading, setLoading] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const expandedRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (expandedSection && expandedRef.current) {
+      requestAnimationFrame(() => {
+        expandedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }, [expandedSection]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -68,15 +77,19 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
               <p className="text-sm text-primary/60 dark:text-white/60">No guide sections available.</p>
             </div>
           ) : (
-            sections.map((section) => (
+            sections.map((section) => {
+              const sectionId = String(section.id);
+              const isExpanded = expandedSection === sectionId;
+              return (
               <div
                 key={section.id}
-                className="bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer tactile-row"
-                onClick={() => setExpandedSection(expandedSection === String(section.id) ? null : String(section.id))}
+                ref={isExpanded ? expandedRef : undefined}
+                className="accordion-item-wrapper bg-white/60 dark:bg-white/5 backdrop-blur-sm rounded-xl border border-primary/10 dark:border-white/25 overflow-hidden hover:bg-white/80 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                onClick={() => setExpandedSection(isExpanded ? null : sectionId)}
                 role="button"
                 tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSection(expandedSection === String(section.id) ? null : String(section.id)); } }}
-                aria-expanded={expandedSection === String(section.id)}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpandedSection(isExpanded ? null : sectionId); } }}
+                aria-expanded={isExpanded}
               >
                 <div className="flex items-center">
                   <div className="flex-1 flex items-center gap-4 p-5 text-left">
@@ -87,11 +100,11 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
                       <h3 className="font-bold text-primary dark:text-white">{section.title}</h3>
                       <p className="text-sm text-primary/80 dark:text-white/80">{section.description}</p>
                     </div>
-                    <Icon name="expand_more" className={`text-primary/70 dark:text-white/70 transition-transform duration-normal ${expandedSection === String(section.id) ? 'rotate-180' : ''}`} />
+                    <Icon name="expand_more" className={`text-primary/70 dark:text-white/70 transition-transform duration-normal ${isExpanded ? 'rotate-180' : ''}`} />
                   </div>
                 </div>
 
-                <div className={`overflow-hidden transition-all duration-normal ${expandedSection === String(section.id) ? 'max-h-[5000px]' : 'max-h-0'}`}>
+                <div className={`overflow-hidden transition-all duration-normal ${isExpanded ? 'max-h-[5000px]' : 'max-h-0'}`}>
                   <div className="px-5 pb-5 space-y-4">
                     {section.steps.map((step, index) => (
                       <div key={index} className="flex gap-4">
@@ -117,7 +130,7 @@ export default function ContextualHelp({ guideIds, title = 'Page Guide' }: Conte
                   </div>
                 </div>
               </div>
-            ))
+            );})
           )}
         </div>
       </SlideUpDrawer>
