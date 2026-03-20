@@ -48,19 +48,36 @@ export async function findExistingStripeProduct(
   }
 }
 
+export function resolveAppCategory(productType: string | null | undefined): string {
+  if (productType === 'one_time' || productType === 'fee') return 'fee';
+  if (productType === 'config') return 'config';
+  return 'membership';
+}
+
 export function buildPrivilegeMetadata(tier: TierRecord): Record<string, string> {
   const NON_SUBSCRIPTION_PRODUCT_TYPES = ['one_time', 'config', 'fee'];
-  const resolvedProductType = tier.productType && NON_SUBSCRIPTION_PRODUCT_TYPES.includes(tier.productType)
-    ? tier.productType
-    : tier.productType || 'subscription';
+  const isSubscription = !tier.productType || !NON_SUBSCRIPTION_PRODUCT_TYPES.includes(tier.productType);
+  const resolvedProductType = isSubscription
+    ? (tier.productType || 'subscription')
+    : tier.productType!;
+  const appCategory = resolveAppCategory(tier.productType);
+
   const metadata: Record<string, string> = {
     tier_id: tier.id.toString(),
     tier_slug: tier.slug,
     product_type: resolvedProductType,
     source: 'ever_house_app',
-    app_category: tier.productType === 'one_time' ? 'fee' : tier.productType === 'config' ? 'config' : 'membership',
+    app_category: appCategory,
   };
-  
+
+  if (!isSubscription) {
+    if (tier.slug.includes('guest')) metadata.fee_type = 'guest_pass';
+    else if (tier.slug.includes('overage')) metadata.fee_type = 'simulator_overage';
+    else if (tier.slug.includes('day-pass')) metadata.fee_type = 'day_pass';
+    else metadata.fee_type = 'general';
+    return metadata;
+  }
+
   if (tier.dailySimMinutes != null) {
     metadata.privilege_daily_sim_minutes = tier.dailySimMinutes.toString();
   }

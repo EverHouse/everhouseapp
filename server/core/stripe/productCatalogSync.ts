@@ -7,7 +7,8 @@ import Stripe from 'stripe';
 import { clearTierCache } from '../tierService';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { logger } from '../logger';
-import { type StripePaginationParams, type StripeProductWithMarketingFeatures, buildFeatureKeysForTier } from './productHelpers';
+import { type TierRecord, type StripePaginationParams, type StripeProductWithMarketingFeatures, buildFeatureKeysForTier } from './productHelpers';
+import { markAppOriginated } from './appOriginTracker';
 
 export async function syncTierFeaturesToStripe(): Promise<{
   success: boolean;
@@ -158,6 +159,120 @@ export async function syncTierFeaturesToStripe(): Promise<{
   }
 }
 
+export async function syncSingleTierFeaturesToStripe(
+  tier: TierRecord,
+  stripeProductId: string
+): Promise<{ success: boolean; attached: number; removed: number; created: number }> {
+  let attached = 0;
+  let removed = 0;
+  let created = 0;
+
+  try {
+    const stripe = await getStripeClient();
+    const desiredFeatures = buildFeatureKeysForTier(tier);
+    const desiredKeys = new Set(desiredFeatures.map(f => f.lookupKey));
+
+    const existingFeatures = new Map<string, string>();
+    let hasMoreFeatures = true;
+    let startingAfterFeature: string | undefined;
+
+    while (hasMoreFeatures) {
+      const params: StripePaginationParams = { limit: 100 };
+      if (startingAfterFeature) params.starting_after = startingAfterFeature;
+      const featureList = await stripe.entitlements.features.list(params);
+      for (const f of featureList.data) {
+        existingFeatures.set(f.lookup_key, f.id);
+      }
+      hasMoreFeatures = featureList.has_more;
+      if (featureList.data.length > 0) {
+        startingAfterFeature = featureList.data[featureList.data.length - 1].id;
+      }
+    }
+
+    for (const feature of desiredFeatures) {
+      if (!existingFeatures.has(feature.lookupKey)) {
+        try {
+          const createdFeature = await stripe.entitlements.features.create({
+            lookup_key: feature.lookupKey,
+            name: feature.name,
+            metadata: feature.metadata || {},
+          }, {
+            idempotencyKey: `feature_${feature.lookupKey}`
+          });
+          existingFeatures.set(feature.lookupKey, createdFeature.id);
+          created++;
+          logger.info(`[Feature Sync] Created feature: ${feature.name} (${feature.lookupKey})`);
+        } catch (err: unknown) {
+          if (getErrorCode(err) === 'resource_already_exists') {
+            const refetch = await stripe.entitlements.features.list({ lookup_key: feature.lookupKey, limit: 1 });
+            if (refetch.data.length > 0) {
+              existingFeatures.set(feature.lookupKey, refetch.data[0].id);
+            }
+          } else {
+            logger.error(`[Feature Sync] Error creating feature ${feature.lookupKey}:`, { extra: { detail: getErrorMessage(err) } });
+          }
+        }
+      }
+    }
+
+    const attachedFeatures = new Map<string, string>();
+    let hasMoreAttached = true;
+    let startingAfterAttached: string | undefined;
+
+    while (hasMoreAttached) {
+      const params: StripePaginationParams = { limit: 100 };
+      if (startingAfterAttached) params.starting_after = startingAfterAttached;
+      const attachedList = await stripe.products.listFeatures(stripeProductId, params);
+      for (const af of attachedList.data) {
+        if (af.entitlement_feature?.lookup_key) {
+          attachedFeatures.set(af.entitlement_feature.lookup_key, af.id);
+        }
+      }
+      hasMoreAttached = attachedList.has_more;
+      if (attachedList.data.length > 0) {
+        startingAfterAttached = attachedList.data[attachedList.data.length - 1].id;
+      }
+    }
+
+    for (const feature of desiredFeatures) {
+      if (!attachedFeatures.has(feature.lookupKey)) {
+        const featureId = existingFeatures.get(feature.lookupKey);
+        if (featureId) {
+          try {
+            markAppOriginated(stripeProductId);
+            await stripe.products.createFeature(stripeProductId, {
+              entitlement_feature: featureId,
+            });
+            attached++;
+            logger.info(`[Feature Sync] Attached ${feature.lookupKey} to tier "${tier.name}"`);
+          } catch (err: unknown) {
+            logger.error(`[Feature Sync] Error attaching ${feature.lookupKey} to tier "${tier.name}":`, { extra: { detail: getErrorMessage(err) } });
+          }
+        }
+      }
+    }
+
+    for (const [attachedKey, attachmentId] of attachedFeatures) {
+      if (!desiredKeys.has(attachedKey)) {
+        try {
+          markAppOriginated(stripeProductId);
+          await stripe.products.deleteFeature(stripeProductId, attachmentId);
+          removed++;
+          logger.info(`[Feature Sync] Removed ${attachedKey} from tier "${tier.name}"`);
+        } catch (err: unknown) {
+          logger.error(`[Feature Sync] Error removing ${attachedKey} from tier "${tier.name}":`, { extra: { detail: getErrorMessage(err) } });
+        }
+      }
+    }
+
+    logger.info(`[Feature Sync] Single tier "${tier.name}": ${created} created, ${attached} attached, ${removed} removed`);
+    return { success: true, attached, removed, created };
+  } catch (error: unknown) {
+    logger.error(`[Feature Sync] Error syncing features for tier "${tier.name}":`, { error: getErrorMessage(error) });
+    return { success: false, attached, removed, created };
+  }
+}
+
 export async function syncCafeItemsToStripe(): Promise<{
   success: boolean;
   synced: number;
@@ -280,6 +395,9 @@ export async function syncCafeItemsToStripe(): Promise<{
             currency: 'usd',
             metadata: {
               cafe_item_id: itemId,
+              product_type: 'one_time',
+              app_category: 'cafe',
+              source: 'ever_house_app',
             },
           }, {
             idempotencyKey: `price_cafe_${itemId}_${priceCents}_${Date.now()}`

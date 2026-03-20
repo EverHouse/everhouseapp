@@ -6,7 +6,9 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { isAdmin, isStaffOrAdmin } from '../core/middleware';
 import { invalidateTierCache } from '../core/tierService';
-import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe } from '../core/stripe/products';
+import { syncMembershipTiersToStripe, getTierSyncStatus, cleanupOrphanStripeProducts, syncTierFeaturesToStripe, syncCafeItemsToStripe, pullTierFeaturesFromStripe, pullCafeItemsFromStripe, archiveAllStalePrices } from '../core/stripe/products';
+import { autoPushTierToStripe, autoPushFeeToStripe } from '../core/stripe/autoPush';
+import { updateOverageRate, updateGuestFee } from '../core/billing/pricingConfig';
 import { logFromRequest } from '../core/auditLog';
 import { getErrorCode, safeErrorDetail, getErrorMessage } from '../utils/errorUtils';
 import { getCached, setCache, invalidateCache as invalidateQueryCache } from '../core/queryCache';
@@ -217,6 +219,10 @@ router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema),
     if (updatedTier.slug) invalidateTierCache(String(updatedTier.slug));
     invalidateQueryCache(TIERS_CACHE_KEY);
     
+    autoPushTierToStripe(updatedTier as Record<string, unknown> & { id: number; name: string; slug: string }).catch(err => {
+      logger.error('[AutoPush] Background tier push failed', { error: getErrorMessage(err) });
+    });
+
     res.json(updatedTier);
   } catch (error: unknown) {
     logger.error('Membership tier update error', { error: getErrorMessage(error) });
@@ -265,6 +271,10 @@ router.post('/api/membership-tiers', isAdmin, validateBody(createTierSchema), as
     if (newTier.slug) invalidateTierCache(String(newTier.slug));
     invalidateQueryCache(TIERS_CACHE_KEY);
     
+    autoPushTierToStripe(newTier as Record<string, unknown> & { id: number; name: string; slug: string }).catch(err => {
+      logger.error('[AutoPush] Background tier push failed', { error: getErrorMessage(err) });
+    });
+
     res.status(201).json(result.rows[0]);
   } catch (error: unknown) {
     logger.error('Membership tier create error', { error: getErrorMessage(error) });
@@ -296,6 +306,10 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
     // Step 4: Sync cafe items to Stripe
     const cafeResult = await syncCafeItemsToStripe();
     logger.info('[Admin] Cafe sync complete: synced, failed, skipped', { extra: { cafeResultSynced: cafeResult.synced, cafeResultFailed: cafeResult.failed, cafeResultSkipped: cafeResult.skipped } });
+
+    // Step 5: Archive stale prices (duplicates) across all products
+    const stalePriceResult = await archiveAllStalePrices();
+    logger.info('[Admin] Stale price cleanup complete: archived, errors', { extra: { stalePricesArchived: stalePriceResult.totalArchived, stalePriceErrors: stalePriceResult.totalErrors } });
     
     invalidateQueryCache(TIERS_CACHE_KEY);
 
@@ -311,6 +325,7 @@ router.post('/api/admin/stripe/sync-products', isStaffOrAdmin, async (req, res) 
       cleanupDetails: cleanupResult.results,
       featureSync: featureResult,
       cafeSync: cafeResult,
+      stalePriceCleanup: stalePriceResult,
     });
   } catch (error: unknown) {
     logger.error('[Admin] Stripe sync error', { error: getErrorMessage(error) });
@@ -326,6 +341,58 @@ router.get('/api/admin/stripe/sync-status', isStaffOrAdmin, async (req, res) => 
   } catch (error: unknown) {
     logger.error('[Admin] Error getting sync status', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to get sync status' });
+  }
+});
+
+const feeUpdateSchema = z.object({
+  price_cents: z.number().int().min(0, 'Price must be non-negative'),
+});
+
+router.put('/api/admin/pricing/guest-fee', isAdmin, validateBody(feeUpdateSchema), async (req, res) => {
+  try {
+    const { price_cents } = req.body;
+    updateGuestFee(price_cents);
+
+    const pushResult = await autoPushFeeToStripe('guest-pass', price_cents);
+    if (!pushResult.success) {
+      logger.warn('[Admin] Guest fee updated locally but Stripe push failed', { extra: { error: pushResult.error } });
+    }
+
+    logFromRequest(req, {
+      action: 'update_guest_fee',
+      resourceType: 'pricing',
+      resourceName: 'Guest Fee',
+      details: { price_cents },
+    });
+
+    res.json({ success: true, price_cents, stripe_synced: pushResult.success });
+  } catch (error: unknown) {
+    logger.error('[Admin] Error updating guest fee', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to update guest fee' });
+  }
+});
+
+router.put('/api/admin/pricing/overage-rate', isAdmin, validateBody(feeUpdateSchema), async (req, res) => {
+  try {
+    const { price_cents } = req.body;
+    updateOverageRate(price_cents);
+
+    const pushResult = await autoPushFeeToStripe('simulator-overage-30min', price_cents);
+    if (!pushResult.success) {
+      logger.warn('[Admin] Overage rate updated locally but Stripe push failed', { extra: { error: pushResult.error } });
+    }
+
+    logFromRequest(req, {
+      action: 'update_overage_rate',
+      resourceType: 'pricing',
+      resourceName: 'Overage Rate',
+      details: { price_cents },
+    });
+
+    res.json({ success: true, price_cents, stripe_synced: pushResult.success });
+  } catch (error: unknown) {
+    logger.error('[Admin] Error updating overage rate', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to update overage rate' });
   }
 });
 

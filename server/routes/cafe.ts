@@ -11,6 +11,7 @@ import { cafeItems } from '../../shared/schema';
 import { sql, eq, and, asc } from 'drizzle-orm';
 import { getCached, setCache, invalidateCache } from '../core/queryCache';
 import { validateBody } from '../middleware/validate';
+import { autoPushCafeItemToStripe } from '../core/stripe/autoPush';
 
 const cafeItemSchema = z.object({
   category: z.string().min(1, 'Category is required'),
@@ -104,10 +105,24 @@ router.post('/api/cafe-menu', isStaffOrAdmin, validateBody(cafeItemSchema), asyn
       sortOrder: sort_order || 0,
     }).returning();
     
+    const newItem = result[0];
+
+    autoPushCafeItemToStripe({
+      id: newItem.id,
+      name: newItem.name,
+      description: newItem.description,
+      price: String(newItem.price),
+      category: newItem.category,
+      stripeProductId: null,
+      stripePriceId: null,
+    }).catch(err => {
+      logger.error('[AutoPush] Background cafe item creation push failed', { error: getErrorMessage(err) });
+    });
+
     invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('created');
-    logFromRequest(req, 'create_cafe_item', 'cafe', String(result[0].id), result[0].name || name, {});
-    res.status(201).json(result[0]);
+    logFromRequest(req, 'create_cafe_item', 'cafe', String(newItem.id), newItem.name || name, {});
+    res.status(201).json(newItem);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item creation error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to create cafe item' });
@@ -135,40 +150,35 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSche
       return res.status(404).json({ error: 'Cafe item not found' });
     }
     
-    let result;
-    if (existing[0].stripeProductId) {
-      const nameChanged = name !== undefined && name !== existing[0].name;
-      const priceChanged = price !== undefined && String(price) !== String(existing[0].price);
-      const categoryChanged = category !== undefined && category !== existing[0].category;
-      if (nameChanged || priceChanged || categoryChanged) {
-        return res.status(400).json({ 
-          error: 'Cannot change name, price, or category for Stripe-linked items. Update these fields directly in Stripe and use "Pull from Stripe" to sync changes.' 
-        });
-      }
-      result = await db.update(cafeItems).set({
-        description: sql`COALESCE(${description}, ${cafeItems.description})`,
-        icon: sql`COALESCE(${icon}, ${cafeItems.icon})`,
-        imageUrl: sql`COALESCE(${image_url}, ${cafeItems.imageUrl})`,
-        isActive: sql`COALESCE(${is_active}, ${cafeItems.isActive})`,
-        sortOrder: sql`COALESCE(${sort_order}, ${cafeItems.sortOrder})`,
-      }).where(eq(cafeItems.id, numericId)).returning();
-    } else {
-      result = await db.update(cafeItems).set({
-        category: sql`COALESCE(${category}, ${cafeItems.category})`,
-        name: sql`COALESCE(${name}, ${cafeItems.name})`,
-        price: sql`COALESCE(${price}, ${cafeItems.price})`,
-        description: sql`COALESCE(${description}, ${cafeItems.description})`,
-        icon: sql`COALESCE(${icon}, ${cafeItems.icon})`,
-        imageUrl: sql`COALESCE(${image_url}, ${cafeItems.imageUrl})`,
-        isActive: sql`COALESCE(${is_active}, ${cafeItems.isActive})`,
-        sortOrder: sql`COALESCE(${sort_order}, ${cafeItems.sortOrder})`,
-      }).where(eq(cafeItems.id, numericId)).returning();
-    }
+    const result = await db.update(cafeItems).set({
+      category: sql`COALESCE(${category}, ${cafeItems.category})`,
+      name: sql`COALESCE(${name}, ${cafeItems.name})`,
+      price: sql`COALESCE(${price}, ${cafeItems.price})`,
+      description: sql`COALESCE(${description}, ${cafeItems.description})`,
+      icon: sql`COALESCE(${icon}, ${cafeItems.icon})`,
+      imageUrl: sql`COALESCE(${image_url}, ${cafeItems.imageUrl})`,
+      isActive: sql`COALESCE(${is_active}, ${cafeItems.isActive})`,
+      sortOrder: sql`COALESCE(${sort_order}, ${cafeItems.sortOrder})`,
+    }).where(eq(cafeItems.id, numericId)).returning();
     
+    const updatedItem = result[0];
+
+    autoPushCafeItemToStripe({
+      id: updatedItem.id,
+      name: updatedItem.name,
+      description: updatedItem.description,
+      price: String(updatedItem.price),
+      category: updatedItem.category,
+      stripeProductId: updatedItem.stripeProductId || existing[0].stripeProductId,
+      stripePriceId: updatedItem.stripePriceId,
+    }).catch(err => {
+      logger.error('[AutoPush] Background cafe item push failed', { error: getErrorMessage(err) });
+    });
+
     invalidateCache(CAFE_CACHE_KEY);
     broadcastCafeMenuUpdate('updated');
     logFromRequest(req, 'update_cafe_item', 'cafe', String(id), name, {});
-    res.json(result[0]);
+    res.json(updatedItem);
   } catch (error: unknown) {
     if (!isProduction) logger.error('Cafe item update error', { error: getErrorMessage(error) });
     res.status(500).json({ error: 'Failed to update cafe item' });

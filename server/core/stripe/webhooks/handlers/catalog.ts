@@ -4,6 +4,7 @@ import { clearTierCache } from '../../../tierService';
 import { updateOverageRate, updateGuestFee } from '../../../billing/pricingConfig';
 import { logger } from '../../../logger';
 import { getErrorMessage } from '../../../../utils/errorUtils';
+import { isAppOriginated } from '../../appOriginTracker';
 import type { PoolClient } from 'pg';
 import type { DeferredAction, StripeProductWithMarketingFeatures } from '../types';
 
@@ -11,6 +12,11 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
   const deferredActions: DeferredAction[] = [];
 
   try {
+    if (isAppOriginated(product.id)) {
+      logger.info(`[Stripe Webhook] Skipping app-originated product.updated for ${product.id} (${product.name})`);
+      return deferredActions;
+    }
+
     logger.info(`[Stripe Webhook] Product updated: ${product.id} (${product.name})`);
 
     const tierMatch = await client.query(
@@ -23,26 +29,95 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
       const tierName = tierMatch.rows[0].name;
       logger.info(`[Stripe Webhook] Product ${product.id} matches tier "${tierName}", deferring feature pull`);
 
+      const tierUpdateParts: string[] = ['updated_at = NOW()'];
+      const tierUpdateValues: unknown[] = [];
+      let paramIdx = 1;
+
+      if (product.name) {
+        const displayName = product.name.replace(/ Membership$/, '');
+        if (displayName !== tierName) {
+          tierUpdateParts.push(`name = $${paramIdx++}`);
+          tierUpdateValues.push(displayName);
+        }
+      }
+      if (product.description !== undefined) {
+        tierUpdateParts.push(`description = $${paramIdx++}`);
+        tierUpdateValues.push(product.description || null);
+      }
+
       if (Array.isArray(product.marketing_features) && product.marketing_features.length > 0) {
         const featureNames = product.marketing_features
           .map((f: { name: string }) => f.name)
           .filter((n: string) => n && n.trim());
         if (featureNames.length > 0) {
-          await client.query(
-            'UPDATE membership_tiers SET highlighted_features = $1, updated_at = NOW() WHERE id = $2',
-            [JSON.stringify(featureNames), tierId]
-          );
+          tierUpdateParts.push(`highlighted_features = $${paramIdx++}`);
+          tierUpdateValues.push(JSON.stringify(featureNames));
           logger.info(`[Stripe Webhook] Updated highlighted features for "${tierName}" from ${featureNames.length} marketing features`);
-        } else {
-          logger.info(`[Stripe Webhook] Skipping highlighted_features update for "${tierName}" — marketing_features present but all empty names`);
         }
-      } else {
-        logger.info(`[Stripe Webhook] Skipping highlighted_features update for "${tierName}" — no marketing_features in webhook payload`);
+      }
+
+      const meta = product.metadata || {};
+      const isSubscriptionProduct = meta.product_type === 'subscription' || (!meta.product_type && !['one_time', 'fee', 'config'].includes(meta.product_type || ''));
+
+      if (isSubscriptionProduct) {
+        const privilegeFields: Array<{ metaKey: string; dbCol: string; type: 'int' | 'bool' }> = [
+          { metaKey: 'privilege_daily_sim_minutes', dbCol: 'daily_sim_minutes', type: 'int' },
+          { metaKey: 'privilege_guest_passes', dbCol: 'guest_passes_per_year', type: 'int' },
+          { metaKey: 'privilege_booking_window_days', dbCol: 'booking_window_days', type: 'int' },
+          { metaKey: 'privilege_conf_room_minutes', dbCol: 'daily_conf_room_minutes', type: 'int' },
+          { metaKey: 'privilege_unlimited_access', dbCol: 'unlimited_access', type: 'bool' },
+          { metaKey: 'privilege_can_book_simulators', dbCol: 'can_book_simulators', type: 'bool' },
+          { metaKey: 'privilege_can_book_conference', dbCol: 'can_book_conference', type: 'bool' },
+          { metaKey: 'privilege_can_book_wellness', dbCol: 'can_book_wellness', type: 'bool' },
+          { metaKey: 'privilege_group_lessons', dbCol: 'has_group_lessons', type: 'bool' },
+          { metaKey: 'privilege_private_lesson', dbCol: 'has_private_lesson', type: 'bool' },
+          { metaKey: 'privilege_sim_guest_passes', dbCol: 'has_simulator_guest_passes', type: 'bool' },
+          { metaKey: 'privilege_discounted_merch', dbCol: 'has_discounted_merch', type: 'bool' },
+        ];
+
+        let hasPrivilegeMetadata = false;
+        for (const pf of privilegeFields) {
+          if (meta[pf.metaKey] !== undefined) {
+            hasPrivilegeMetadata = true;
+            break;
+          }
+        }
+
+        if (hasPrivilegeMetadata) {
+          for (const pf of privilegeFields) {
+            if (meta[pf.metaKey] !== undefined) {
+              if (pf.type === 'bool') {
+                tierUpdateParts.push(`${pf.dbCol} = $${paramIdx++}`);
+                tierUpdateValues.push(meta[pf.metaKey] === 'true');
+              } else {
+                const numVal = parseInt(meta[pf.metaKey], 10);
+                if (!isNaN(numVal)) {
+                  tierUpdateParts.push(`${pf.dbCol} = $${paramIdx++}`);
+                  tierUpdateValues.push(numVal);
+                }
+              }
+            } else {
+              tierUpdateParts.push(`${pf.dbCol} = $${paramIdx++}`);
+              tierUpdateValues.push(pf.type === 'bool' ? false : (pf.dbCol === 'booking_window_days' ? 7 : 0));
+            }
+          }
+          logger.info(`[Stripe Webhook] Syncing privilege metadata for tier "${tierName}" from Stripe product (missing keys reset to defaults)`);
+        }
+      }
+
+      if (tierUpdateValues.length > 0) {
+        tierUpdateValues.push(tierId);
+        await client.query(
+          `UPDATE membership_tiers SET ${tierUpdateParts.join(', ')} WHERE id = $${paramIdx}`,
+          tierUpdateValues
+        );
+        logger.info(`[Stripe Webhook] Updated tier "${tierName}" fields from Stripe product`);
       }
 
       deferredActions.push(async () => {
         await pullTierFeaturesFromStripe();
       });
+      clearTierCache();
       return deferredActions;
     }
 
@@ -149,6 +224,11 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
   const deferredActions: DeferredAction[] = [];
 
   try {
+    if (isAppOriginated(price.id)) {
+      logger.info(`[Stripe Webhook] Skipping app-originated price change for ${price.id}`);
+      return deferredActions;
+    }
+
     const productId = typeof price.product === 'string' ? price.product : price.product?.id;
     if (!productId) return deferredActions;
 
@@ -171,27 +251,22 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
     }
 
     const tierResult = await client.query(
-      `UPDATE membership_tiers SET price_cents = $1, stripe_price_id = $2
-       WHERE stripe_product_id = $3
-       RETURNING id, name`,
-      [priceCents, price.id, productId]
+      `UPDATE membership_tiers SET price_cents = $1, stripe_price_id = $2, price_string = $3, updated_at = NOW()
+       WHERE stripe_product_id = $4
+       RETURNING id, name, slug`,
+      [priceCents, price.id, `$${priceDecimal}`, productId]
     );
 
     if (tierResult.rowCount && tierResult.rowCount > 0) {
       for (const row of tierResult.rows) {
         logger.info(`[Stripe Webhook] Updated tier "${row.name}" price to ${priceCents} cents ($${priceDecimal})`);
+        if (row.slug === 'simulator-overage-30min') {
+          updateOverageRate(priceCents);
+        } else if (row.slug === 'guest-pass') {
+          updateGuestFee(priceCents);
+        }
       }
       clearTierCache();
-
-      const slugResult = await client.query(
-        `SELECT slug FROM membership_tiers WHERE stripe_product_id = $1`, [productId]
-      );
-      const slug = slugResult.rows[0]?.slug;
-      if (slug === 'simulator-overage-30min') {
-        updateOverageRate(priceCents);
-      } else if (slug === 'guest-pass') {
-        updateGuestFee(priceCents);
-      }
     }
   } catch (error: unknown) {
     logger.error('[Stripe Webhook] Error handling price change:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });

@@ -1,11 +1,12 @@
 import { db } from '../../db';
-import { membershipTiers } from '../../../shared/schema';
-import { eq } from 'drizzle-orm';
+import { membershipTiers, cafeItems } from '../../../shared/schema';
+import { eq, sql, and, isNotNull } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
 import { getErrorMessage } from '../../utils/errorUtils';
 import { logger } from '../logger';
 import { findExistingStripeProduct, buildPrivilegeMetadata, type StripePaginationParams } from './productHelpers';
+import { markAppOriginated } from './appOriginTracker';
 
 export interface TierSyncResult {
   tierId: number;
@@ -91,7 +92,7 @@ export async function syncMembershipTiersToStripe(): Promise<{
           await stripe.products.update(stripeProductId, updateParams);
           logger.info(`[Tier Sync] Updated existing product for ${tier.name} with privileges${hasMarketingFeatures ? ' and features' : ''}`);
 
-          const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
+          const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription', app_category: 'membership', source: 'ever_house_app' };
           
           if (stripePriceId) {
             try {
@@ -200,12 +201,12 @@ export async function syncMembershipTiersToStripe(): Promise<{
           }
           stripeProductId = stripeProduct.id;
 
-          const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
+          const priceMetadata2 = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription', app_category: 'membership', source: 'ever_house_app' };
           const priceParams: Stripe.PriceCreateParams = {
             product: stripeProductId,
             unit_amount: tier.priceCents,
             currency: 'usd',
-            metadata: priceMetadata,
+            metadata: priceMetadata2,
             recurring: { interval: billingInterval },
           };
           const stripePrice = await stripe.prices.create(priceParams, {
@@ -403,4 +404,106 @@ export async function cleanupOrphanStripeProducts(): Promise<{
     logger.error('[Stripe Cleanup] Fatal error:', { error: error });
     return { success: false, archived, skipped, errors, results };
   }
+}
+
+export async function archiveStalePricesForProduct(stripeProductId: string, currentPriceId: string): Promise<{ archived: number; errors: number; skipped: boolean }> {
+  let archived = 0;
+  let errors = 0;
+  try {
+    const stripe = await getStripeClient();
+
+    try {
+      const keepPrice = await stripe.prices.retrieve(currentPriceId);
+      if (!keepPrice.active) {
+        logger.warn(`[Stale Price Cleanup] Keep-price ${currentPriceId} is inactive on product ${stripeProductId}, skipping archival to avoid deactivating all prices`);
+        return { archived: 0, errors: 0, skipped: true };
+      }
+    } catch {
+      logger.warn(`[Stale Price Cleanup] Keep-price ${currentPriceId} not found on product ${stripeProductId}, skipping archival`);
+      return { archived: 0, errors: 0, skipped: true };
+    }
+
+    let hasMore = true;
+    let startingAfter: string | undefined;
+
+    while (hasMore) {
+      const params: { product: string; active: boolean; limit: number; starting_after?: string } = {
+        product: stripeProductId,
+        active: true,
+        limit: 100,
+      };
+      if (startingAfter) params.starting_after = startingAfter;
+
+      const prices = await stripe.prices.list(params);
+
+      for (const price of prices.data) {
+        if (price.id === currentPriceId) continue;
+        try {
+          markAppOriginated(price.id);
+          await stripe.prices.update(price.id, { active: false });
+          archived++;
+          logger.info(`[Stale Price Cleanup] Archived stale price ${price.id} on product ${stripeProductId}`);
+        } catch (err: unknown) {
+          errors++;
+          logger.error(`[Stale Price Cleanup] Failed to archive price ${price.id}:`, { error: getErrorMessage(err) });
+        }
+      }
+
+      hasMore = prices.has_more;
+      if (prices.data.length > 0) {
+        startingAfter = prices.data[prices.data.length - 1].id;
+      }
+    }
+  } catch (error: unknown) {
+    logger.error(`[Stale Price Cleanup] Error listing prices for ${stripeProductId}:`, { error: getErrorMessage(error) });
+    errors++;
+  }
+  return { archived, errors, skipped: false };
+}
+
+export async function archiveAllStalePrices(): Promise<{ totalArchived: number; totalErrors: number; productsProcessed: number; productsSkipped: number }> {
+  let totalArchived = 0;
+  let totalErrors = 0;
+  let productsProcessed = 0;
+  let productsSkipped = 0;
+
+  try {
+    const tiers = await db.select().from(membershipTiers).where(eq(membershipTiers.isActive, true));
+
+    for (const tier of tiers) {
+      if (!tier.stripeProductId || !tier.stripePriceId) continue;
+      const result = await archiveStalePricesForProduct(tier.stripeProductId, tier.stripePriceId);
+      if (result.skipped) { productsSkipped++; continue; }
+      totalArchived += result.archived;
+      totalErrors += result.errors;
+      productsProcessed++;
+    }
+
+    const cafeRows = await db.select({
+      id: cafeItems.id,
+      stripeProductId: cafeItems.stripeProductId,
+      stripePriceId: cafeItems.stripePriceId,
+    }).from(cafeItems).where(
+      and(
+        eq(cafeItems.isActive, true),
+        isNotNull(cafeItems.stripeProductId),
+        isNotNull(cafeItems.stripePriceId)
+      )
+    );
+    for (const row of cafeRows) {
+      if (!row.stripeProductId || !row.stripePriceId) continue;
+      const result = await archiveStalePricesForProduct(row.stripeProductId, row.stripePriceId);
+      if (result.skipped) { productsSkipped++; continue; }
+      totalArchived += result.archived;
+      totalErrors += result.errors;
+      productsProcessed++;
+    }
+
+    logger.info(`[Stale Price Cleanup] Complete: ${totalArchived} prices archived across ${productsProcessed} products, ${productsSkipped} skipped`);
+  } catch (error: unknown) {
+    logger.error('[Stale Price Cleanup] Fatal error:', { error: getErrorMessage(error) });
+    totalErrors++;
+  }
+
+  return { totalArchived, totalErrors, productsProcessed, productsSkipped };
 }
