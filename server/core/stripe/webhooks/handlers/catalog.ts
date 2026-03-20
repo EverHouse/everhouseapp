@@ -227,6 +227,11 @@ export async function handleProductDeleted(client: PoolClient, product: Stripe.P
   const deferredActions: DeferredAction[] = [];
 
   try {
+    if (isAppOriginated(product.id)) {
+      logger.info(`[Stripe Webhook] Skipping app-originated product.deleted for ${product.id} (${product.name})`);
+      return deferredActions;
+    }
+
     logger.info(`[Stripe Webhook] Product deleted: ${product.id} (${product.name})`);
 
     const tierMatch = await client.query(

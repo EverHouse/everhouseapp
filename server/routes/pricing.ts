@@ -93,21 +93,26 @@ router.put('/api/pricing', isStaffOrAdmin, async (req, res) => {
       }
     }
 
-    if (guestFeeCents !== undefined) updateGuestFee(guestFeeCents);
-    if (overageRateCents !== undefined) updateOverageRate(overageRateCents);
-
     const syncErrors: string[] = [];
 
     if (guestFeeCents !== undefined) {
       const result = await autoPushFeeToStripe('guest-pass', guestFeeCents);
-      if (!result.success) syncErrors.push(`Guest fee: ${result.error}`);
-      else logFromRequest(req, 'update_guest_fee', 'pricing', 'guest-pass', `$${guestFeeCents / 100}`, {});
+      if (!result.success) {
+        syncErrors.push(`Guest fee: ${result.error}`);
+      } else {
+        updateGuestFee(guestFeeCents);
+        logFromRequest(req, 'update_guest_fee', 'pricing', 'guest-pass', `$${guestFeeCents / 100}`, {});
+      }
     }
 
     if (overageRateCents !== undefined) {
       const result = await autoPushFeeToStripe('simulator-overage-30min', overageRateCents);
-      if (!result.success) syncErrors.push(`Overage rate: ${result.error}`);
-      else logFromRequest(req, 'update_overage_rate', 'pricing', 'simulator-overage-30min', `$${overageRateCents / 100}`, {});
+      if (!result.success) {
+        syncErrors.push(`Overage rate: ${result.error}`);
+      } else {
+        updateOverageRate(overageRateCents);
+        logFromRequest(req, 'update_overage_rate', 'pricing', 'simulator-overage-30min', `$${overageRateCents / 100}`, {});
+      }
     }
 
     const synced = syncErrors.length === 0;
@@ -131,7 +136,7 @@ router.put('/api/pricing', isStaffOrAdmin, async (req, res) => {
       syncError: syncErrors.length > 0 ? syncErrors.join('; ') : undefined,
     });
   } catch (error: unknown) {
-    logger.error('Failed to update pricing', { error: error instanceof Error ? error : new Error(String(error)) });
+    logger.error('Failed to update pricing', { error: getErrorMessage(error) });
     return res.status(500).json({ error: 'Failed to update pricing' });
   }
 });

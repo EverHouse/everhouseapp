@@ -2,6 +2,16 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.16] - 2026-03-20
+
+### Source-of-Truth Hardening: Stripe Sync Safety + Validation
+- **Fixed**: Cafe delete now returns `502` and aborts if Stripe product archival fails (non-404 errors). Previously, a Stripe outage would leave an active Stripe product with no matching DB record — an orphaned product with no way to reconcile. The delete only proceeds once Stripe confirms the archive, or if the product is already gone (404).
+- **Fixed**: `handleProductDeleted` webhook handler now checks `isAppOriginated(product.id)` and skips processing if the deletion was initiated by the app. This closes the last gap in webhook loop prevention — previously only `handleProductUpdated` and `handlePriceDeleted` had this guard.
+- **Fixed**: `PUT /api/pricing` now only calls `updateGuestFee()` / `updateOverageRate()` (in-memory config) after `autoPushFeeToStripe` succeeds. Previously, in-memory pricing was updated optimistically before the Stripe push, so if Stripe failed, the runtime would charge the new price while Stripe still held the old one — a source-of-truth drift.
+- **Fixed**: `PUT /api/cafe-menu/:id` now validates that `price` is a non-negative number before writing to the database. Previously, invalid or negative prices could pass Zod's loose `z.union([z.string(), z.number()])` check and cause DB errors or broken Stripe sync.
+- **Fixed**: Pricing route catch block now uses `getErrorMessage(error)` instead of raw `error instanceof Error ? error : new Error(String(error))` pattern, consistent with project error-handling standards.
+- **Scope**: `server/routes/cafe.ts`, `server/routes/pricing.ts`, `server/core/stripe/webhooks/handlers/catalog.ts`.
+
 ## [8.94.15] - 2026-03-20
 
 ### Cafe Item Cleanup: Hard Delete + Webhook Loop Prevention

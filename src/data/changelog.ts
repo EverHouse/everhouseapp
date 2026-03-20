@@ -8,6 +8,18 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.16",
+    date: "2026-03-20",
+    title: "Source-of-Truth Hardening: Stripe Sync Safety + Validation",
+    changes: [
+      "Fixed: Cafe delete now aborts with a clear error if Stripe is unreachable, preventing orphaned Stripe products that would have no local record",
+      "Fixed: Webhook handler for product.deleted now skips app-originated events, sealing the loop-prevention gap that existed on the delete path",
+      "Fixed: Fee pricing updates (guest fee, overage rate) now only update in-memory values after Stripe push succeeds — prevents local/Stripe drift when Stripe is down",
+      "Fixed: Cafe item PUT now validates price is a non-negative number before writing to the database",
+      "Fixed: Pricing error handler now uses standardized getErrorMessage() instead of raw error wrapping",
+    ]
+  },
+  {
     version: "8.94.15",
     date: "2026-03-20",
     title: "Cafe Item Cleanup: Hard Delete + Webhook Loop Prevention",

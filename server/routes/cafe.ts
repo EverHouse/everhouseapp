@@ -148,6 +148,13 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSche
       return res.status(400).json({ error: 'Invalid cafe item ID: must be a number' });
     }
     const { category, name, price, description, icon, image_url, is_active, sort_order } = req.body;
+
+    if (price !== undefined && price !== null) {
+      const numericPrice = Number(price);
+      if (isNaN(numericPrice) || numericPrice < 0) {
+        return res.status(400).json({ error: 'Invalid price: must be a non-negative number' });
+      }
+    }
     
     const existing = await db.select({ id: cafeItems.id })
       .from(cafeItems)
@@ -229,7 +236,8 @@ router.delete('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
       } catch (stripeErr: unknown) {
         const isNotFound = stripeErr instanceof Error && 'statusCode' in stripeErr && (stripeErr as { statusCode: number }).statusCode === 404;
         if (!isNotFound) {
-          logger.warn(`[Cafe] Failed to archive Stripe product ${existing[0].stripeProductId} during delete, proceeding with local delete`, { error: getErrorMessage(stripeErr) });
+          logger.error(`[Cafe] Failed to archive Stripe product ${existing[0].stripeProductId} — aborting delete to prevent orphaned Stripe product`, { error: getErrorMessage(stripeErr) });
+          return res.status(502).json({ error: 'Failed to archive Stripe product — delete aborted to prevent data inconsistency. Try again or archive the product in Stripe first.' });
         }
       }
     }
