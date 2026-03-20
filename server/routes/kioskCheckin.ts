@@ -88,10 +88,10 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchem
             br.user_email
           ) as owner_name,
           COALESCE(
-            (SELECT SUM(bfs.cached_fee_cents)
-             FROM booking_fee_snapshots bfs
-             WHERE bfs.booking_id = br.id
-               AND bfs.payment_status NOT IN ('paid', 'waived', 'cancelled')),
+            (SELECT SUM(bp2.cached_fee_cents)
+             FROM booking_participants bp2
+             WHERE bp2.session_id = br.session_id
+               AND bp2.payment_status NOT IN ('paid', 'waived', 'cancelled')),
             0
           )::int as unpaid_fee_cents
         FROM booking_requests br
