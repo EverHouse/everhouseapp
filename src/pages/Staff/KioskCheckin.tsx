@@ -488,44 +488,50 @@ const KioskCheckin: React.FC = () => {
         </button>
       </div>
 
-      <div className="relative flex-1 flex flex-col items-center justify-center px-6 overflow-y-auto">
+      <div className="relative flex-1 flex flex-col items-center justify-center px-6 overflow-hidden min-h-0">
 
         {state === 'idle' && (
           <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-700 relative">
             <p
-              className="text-xs font-semibold tracking-[0.3em] uppercase mb-5"
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
               style={{ color: OLIVE_ACCENT }}
             >
               Arrival Protocol
             </p>
 
             <h1
-              className="text-5xl md:text-6xl text-center leading-[1.1] mb-4"
+              className="text-4xl md:text-5xl text-center leading-[1.1] mb-2"
               style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
             >
-              Welcome to<br /><em>Ever House</em>
+              Welcome to
             </h1>
+            <img
+              src="/images/everclub-logo-light.webp"
+              alt="Ever Club"
+              className="h-14 md:h-18 w-auto object-contain mx-auto mb-3 opacity-90"
+              style={{ filter: 'brightness(1.3)' }}
+            />
 
-            <p className="text-white/45 text-base text-center max-w-xs mb-10 leading-relaxed">
+            <p className="text-white/45 text-sm text-center max-w-xs mb-6 leading-relaxed">
               Please present your digital key or scan the physical portal code.
             </p>
 
             <div
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-8"
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-6"
               style={{ background: 'rgba(139, 154, 107, 0.12)', border: `1px solid ${CARD_BORDER}`, color: OLIVE_TEXT }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Secure Link Active
             </div>
 
-            <div className="relative w-72 h-72 flex items-center justify-center mb-10">
-              <div className="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
+            <div className="relative w-52 h-52 md:w-64 md:h-64 flex items-center justify-center mb-6">
+              <div className="absolute top-0 left-0 w-7 h-7 border-t-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute top-0 right-0 w-7 h-7 border-t-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute bottom-0 left-0 w-7 h-7 border-b-2 border-l-2" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute bottom-0 right-0 w-7 h-7 border-b-2 border-r-2" style={{ borderColor: OLIVE_ACCENT }} />
 
-              <div className="flex flex-col items-center gap-4">
-                <Icon name="qr_code_scanner" className="text-7xl" style={{ color: 'rgba(139, 154, 107, 0.4)' }} />
+              <div className="flex flex-col items-center gap-3">
+                <Icon name="qr_code_scanner" className="text-6xl" style={{ color: 'rgba(139, 154, 107, 0.4)' }} />
                 <p
                   className="text-[10px] tracking-[0.25em] uppercase font-medium"
                   style={{ color: 'rgba(139, 154, 107, 0.5)' }}
@@ -537,7 +543,7 @@ const KioskCheckin: React.FC = () => {
 
             <button
               onClick={handleStartCheckin}
-              className="tactile-btn group relative w-full max-w-xs py-4 rounded-xl text-lg font-semibold transition-all duration-300"
+              className="tactile-btn group relative w-full max-w-xs py-3.5 rounded-xl text-lg font-semibold transition-all duration-300"
               style={{
                 background: 'rgba(139, 154, 107, 0.15)',
                 border: `1px solid ${CARD_BORDER}`,
@@ -555,21 +561,21 @@ const KioskCheckin: React.FC = () => {
         {state === 'scanning' && (
           <div className="w-full max-w-lg flex flex-col items-center animate-in fade-in duration-300">
             <p
-              className="text-xs font-semibold tracking-[0.3em] uppercase mb-4"
+              className="text-xs font-semibold tracking-[0.3em] uppercase mb-3"
               style={{ color: OLIVE_ACCENT }}
             >
               Arrival Protocol
             </p>
             <h1
-              className="text-4xl md:text-5xl text-center leading-[1.1] mb-3"
+              className="text-3xl md:text-4xl text-center leading-[1.1] mb-2"
               style={{ fontFamily: 'var(--font-headline)', color: CREAM }}
             >
               Present Your Key
             </h1>
-            <p className="text-white/40 text-sm mb-8 text-center">Hold your membership QR code to the camera</p>
+            <p className="text-white/40 text-sm mb-4 text-center">Hold your membership QR code to the camera</p>
 
             <div
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-6"
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-medium tracking-wider uppercase mb-4"
               style={{ background: 'rgba(139, 154, 107, 0.12)', border: `1px solid ${CARD_BORDER}`, color: OLIVE_TEXT }}
             >
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -577,13 +583,13 @@ const KioskCheckin: React.FC = () => {
             </div>
 
             <div className="relative w-full max-w-sm">
-              <div className="absolute -top-2 -left-2 w-8 h-8 border-t-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute -top-2 -right-2 w-8 h-8 border-t-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute -bottom-2 -left-2 w-8 h-8 border-b-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 border-b-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -top-2 -left-2 w-7 h-7 border-t-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -top-2 -right-2 w-7 h-7 border-t-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -bottom-2 -left-2 w-7 h-7 border-b-2 border-l-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
+              <div className="absolute -bottom-2 -right-2 w-7 h-7 border-b-2 border-r-2 z-10" style={{ borderColor: OLIVE_ACCENT }} />
 
               <div className="rounded-lg overflow-hidden bg-black/40" style={{ border: `1px solid ${CARD_BORDER}` }}>
-                <div id={elementId} className="w-full" style={{ minHeight: 350 }} />
+                <div id={elementId} className="w-full" style={{ height: 'min(350px, 45vh)' }} />
               </div>
 
               {cameraError && (
