@@ -94,21 +94,50 @@ export async function syncMembershipTiersToStripe(): Promise<{
           const priceMetadata = { tier_id: tier.id.toString(), tier_slug: tier.slug, product_type: tier.productType || 'subscription' };
           
           if (stripePriceId) {
-            const existingPrice = await stripe.prices.retrieve(stripePriceId);
-            if (existingPrice.unit_amount !== tier.priceCents) {
-              await stripe.prices.update(stripePriceId, { active: false });
-              const priceParams: Stripe.PriceCreateParams = {
-                product: stripeProductId,
-                unit_amount: tier.priceCents,
-                currency: 'usd',
-                metadata: priceMetadata,
-                recurring: { interval: billingInterval },
-              };
-              const newPrice = await stripe.prices.create(priceParams, {
-                idempotencyKey: `price_tier_${tier.id}_${tier.priceCents}_update`
-              });
-              stripePriceId = newPrice.id;
-              logger.info(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
+            try {
+              const existingPrice = await stripe.prices.retrieve(stripePriceId);
+              if (!existingPrice.active) {
+                logger.warn(`[Tier Sync] Price ${stripePriceId} for ${tier.name} is inactive, will create replacement`);
+                const priceParams: Stripe.PriceCreateParams = {
+                  product: stripeProductId,
+                  unit_amount: tier.priceCents,
+                  currency: 'usd',
+                  metadata: priceMetadata,
+                  recurring: { interval: billingInterval },
+                };
+                const newPrice = await stripe.prices.create(priceParams);
+                stripePriceId = newPrice.id;
+                logger.info(`[Tier Sync] Created replacement price for ${tier.name} (old was inactive)`);
+              } else if (existingPrice.unit_amount !== tier.priceCents) {
+                await stripe.prices.update(stripePriceId, { active: false });
+                const priceParams: Stripe.PriceCreateParams = {
+                  product: stripeProductId,
+                  unit_amount: tier.priceCents,
+                  currency: 'usd',
+                  metadata: priceMetadata,
+                  recurring: { interval: billingInterval },
+                };
+                const newPrice = await stripe.prices.create(priceParams);
+                stripePriceId = newPrice.id;
+                logger.info(`[Tier Sync] Created new price for ${tier.name} (price changed)`);
+              }
+            } catch (priceErr: unknown) {
+              const errMsg = getErrorMessage(priceErr);
+              if (errMsg.includes('No such price') || errMsg.includes('resource_missing')) {
+                logger.warn(`[Tier Sync] Price ${stripePriceId} for ${tier.name} not found in Stripe, will create replacement`);
+                const priceParams: Stripe.PriceCreateParams = {
+                  product: stripeProductId,
+                  unit_amount: tier.priceCents,
+                  currency: 'usd',
+                  metadata: priceMetadata,
+                  recurring: { interval: billingInterval },
+                };
+                const newPrice = await stripe.prices.create(priceParams);
+                stripePriceId = newPrice.id;
+                logger.info(`[Tier Sync] Created replacement price for ${tier.name} (old was missing)`);
+              } else {
+                throw priceErr;
+              }
             }
           } else {
             const priceParams: Stripe.PriceCreateParams = {
