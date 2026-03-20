@@ -1413,7 +1413,7 @@ export async function importTrackmanBookings(csvPath: string, importedBy?: strin
                     relatedId: bookingId,
                     relatedType: 'booking_request',
                     url: '/sims'
-                  }, { sendPush: true }).catch((err) => { logger.warn('[Trackman Import] Non-critical notification failed:', err); });
+                  }, { sendPush: true }).catch((err) => { logger.warn('[Trackman Import] Non-critical notification failed:', { extra: { error: getErrorMessage(err) } }); });
                 }
                 
                 if (resolvedMemberEmail && normalizedStatus === 'attended') {

@@ -309,7 +309,7 @@ router.post('/api/auth/passkey/authenticate/verify', authRateLimiterByIp, async 
     req.session.user = member;
 
     db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE id = ${user.id} AND first_login_at IS NULL`)
-      .catch((err) => logger.warn('[Passkey] Non-critical first_login_at update failed:', err));
+      .catch((err) => logger.warn('[Passkey] Non-critical first_login_at update failed:', { extra: { error: getErrorMessage(err) } }));
 
     const supabaseToken = await createSupabaseToken(member as unknown as { id: string; email: string; role: string; firstName?: string; lastName?: string });
 

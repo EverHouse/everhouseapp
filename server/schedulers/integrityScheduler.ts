@@ -317,8 +317,8 @@ export function startIntegrityScheduler(): NodeJS.Timeout[] {
   const id1 = setInterval(() => { guardedIntegrityCheck().catch((err) => { logger.error('[Integrity Check] Uncaught error:', { error: err as Error }); }); }, 30 * 60 * 1000);
   const id2 = setInterval(() => { guardedAutoFix().catch((err) => { logger.error('[Auto-Fix] Uncaught error:', { error: err as Error }); }); }, 24 * 60 * 60 * 1000);
   const id3 = setInterval(() => { guardedCleanup().catch((err) => { logger.error('[Auto-Cleanup] Uncaught error:', { error: err as Error }); }); }, 6 * 60 * 60 * 1000);
-  setTimeout(() => guardedCleanup().catch((err) => { logger.warn('[Scheduler] Non-critical cleanup failed:', err); }), 60 * 1000);
-  guardedAutoFix().catch((err) => { logger.warn('[Scheduler] Non-critical auto-fix failed:', err); });
+  setTimeout(() => guardedCleanup().catch((err) => { logger.warn('[Scheduler] Non-critical cleanup failed:', { extra: { error: getErrorMessage(err) } }); }), 60 * 1000);
+  guardedAutoFix().catch((err) => { logger.warn('[Scheduler] Non-critical auto-fix failed:', { extra: { error: getErrorMessage(err) } }); });
   schedulerIntervals = [id1, id2, id3];
   logger.info('[Startup] Daily integrity check scheduler enabled (runs midnight–6am Pacific catch-up window)');
   logger.info('[Startup] Periodic auto-fix scheduler enabled (linked-email tier cleanup — email normalization, status case, billing provider, staff role, participant linking now handled by DB triggers/constraints)');

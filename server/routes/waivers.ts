@@ -9,6 +9,7 @@ import { isProduction } from '../core/db';
 import { logFromRequest } from '../core/auditLog';
 import { logger } from '../core/logger';
 import { safeSendEmail } from '../utils/resend';
+import { getErrorMessage } from '../utils/errorUtils';
 
 const router = Router();
 
@@ -90,7 +91,7 @@ router.post('/api/waivers/sign', isAuthenticated, async (req, res) => {
       WHERE LOWER(email) = ${sessionUser.email.toLowerCase()} 
       AND onboarding_completed_at IS NULL 
       AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
-      AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch((err) => logger.warn('[Waivers] Non-critical onboarding update failed:', err));
+      AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch((err) => logger.warn('[Waivers] Non-critical onboarding update failed:', { extra: { error: getErrorMessage(err) } }));
 
     res.json({
       success: true,

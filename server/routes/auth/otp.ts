@@ -644,7 +644,7 @@ otpRouter.post('/api/auth/verify-otp', ...authRateLimiter, async (req, res) => {
       req.session.user = member;
     }
     
-    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', { extra: { error: getErrorMessage(err) } }));
 
     (async () => {
       try {

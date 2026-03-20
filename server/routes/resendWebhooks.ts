@@ -43,7 +43,7 @@ async function ensureEmailEventsTable() {
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_delivery_status VARCHAR(50) DEFAULT 'active';
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_bounced_at TIMESTAMP WITH TIME ZONE;
     ALTER TABLE users ADD COLUMN IF NOT EXISTS email_marketing_opt_in BOOLEAN DEFAULT true;
-  `).catch((err) => { logger.warn('[Resend] Non-critical email tracking column migration failed:', err); });
+  `).catch((err) => { logger.warn('[Resend] Non-critical email tracking column migration failed:', { extra: { error: getErrorMessage(err) } }); });
 }
 
 async function initEmailEventsWithRetry(maxRetries = 3) {

@@ -289,7 +289,7 @@ sessionRouter.post('/api/auth/password-login', authRateLimiterByIp, async (req, 
       req.session.user = member;
     }
     
-    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', { extra: { error: getErrorMessage(err) } }));
 
     req.session.save((err) => {
       if (err) {
@@ -398,7 +398,7 @@ sessionRouter.post('/api/auth/dev-login', async (req, res) => {
 
     const supabaseToken = await createSupabaseToken({ ...member, email: member.email as string });
     
-    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', err));
+    db.execute(sql`UPDATE users SET first_login_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${member.email}) AND first_login_at IS NULL`).catch((err) => logger.warn('[Auth] Non-critical first_login_at update failed:', { extra: { error: getErrorMessage(err) } }));
 
     req.session.save((err) => {
       if (err) {

@@ -215,7 +215,7 @@ router.put('/api/member/profile', isAuthenticated, async (req, res) => {
       WHERE LOWER(email) = ${email} 
       AND onboarding_completed_at IS NULL 
       AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
-      AND waiver_signed_at IS NOT NULL AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL AND concierge_saved_at IS NOT NULL`).catch((err) => logger.warn('[Onboarding] Non-critical onboarding completion update failed:', err));
+      AND waiver_signed_at IS NOT NULL AND first_booking_at IS NOT NULL AND app_installed_at IS NOT NULL AND concierge_saved_at IS NOT NULL`).catch((err) => logger.warn('[Onboarding] Non-critical onboarding completion update failed:', { extra: { error: getErrorMessage(err) } }));
 
     syncProfileToExternalServices(email, firstName, lastName, phone).catch((err) => {
       logger.error('[onboarding] Background sync to Stripe/HubSpot failed', { error: new Error(getErrorMessage(err)) });

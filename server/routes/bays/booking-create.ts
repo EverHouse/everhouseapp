@@ -491,13 +491,13 @@ router.post('/api/booking-requests', isAuthenticated, bookingRateLimiter, valida
       calendar_event_id: row.calendarEventId,
     });
     
-    db.execute(sql`UPDATE users SET first_booking_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${row.userEmail}) AND first_booking_at IS NULL`).catch((err) => logger.warn('[Booking] Non-critical first_booking_at update failed:', err));
+    db.execute(sql`UPDATE users SET first_booking_at = NOW(), updated_at = NOW() WHERE LOWER(email) = LOWER(${row.userEmail}) AND first_booking_at IS NULL`).catch((err) => logger.warn('[Booking] Non-critical first_booking_at update failed:', { extra: { error: getErrorMessage(err) } }));
 
     db.execute(sql`UPDATE users SET onboarding_completed_at = NOW(), updated_at = NOW() 
       WHERE LOWER(email) = LOWER(${row.userEmail}) 
       AND onboarding_completed_at IS NULL 
       AND first_name IS NOT NULL AND last_name IS NOT NULL AND phone IS NOT NULL
-      AND waiver_signed_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch((err) => logger.warn('[Booking] Non-critical onboarding update failed:', err));
+      AND waiver_signed_at IS NOT NULL AND app_installed_at IS NOT NULL`).catch((err) => logger.warn('[Booking] Non-critical onboarding update failed:', { extra: { error: getErrorMessage(err) } }));
 
     if (resourceType === 'conference_room' && row.resourceId) {
       (async () => {

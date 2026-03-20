@@ -194,7 +194,7 @@ export async function createSupabaseToken(user: { id: string, email: string, rol
         }
       }),
       'Supabase createUser'
-    ).catch((err) => { logger.warn('[Auth] Non-critical Supabase user creation failed:', err); });
+    ).catch((err) => { logger.warn('[Auth] Non-critical Supabase user creation failed:', { extra: { error: getErrorMessage(err) } }); });
     
     const { data: linkData, error: linkError } = await withTimeout(
       supabase.auth.admin.generateLink({
