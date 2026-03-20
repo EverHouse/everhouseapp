@@ -2572,7 +2572,13 @@ html.dark .border-accessible {
   }
   
   .animate-pulse,
-  .animate-pulse-slow {
+  .animate-pulse-slow,
+  .animate-badge-pulse {
+    animation: none !important;
+  }
+
+  .skeleton-shimmer,
+  .shimmer-effect {
     animation: none !important;
   }
   
@@ -2581,6 +2587,7 @@ html.dark .border-accessible {
   .animate-pop-in,
   .animate-banner-slide-down,
   .animate-page-enter,
+  .page-fade-in,
   .animate-content-enter,
   .animate-content-enter-delay-1,
   .animate-content-enter-delay-2,
@@ -2615,6 +2622,8 @@ html.dark .border-accessible {
   .animate-tab-enter,
   .animate-tab-exit,
   .page-fade-out,
+  .animate-skeleton-out,
+  .holographic-shimmer,
   .scroll-reveal,
   .scroll-reveal.is-visible {
     opacity: 1 !important;

@@ -25,6 +25,9 @@ All notable changes to the Ever Club Members App are documented here.
 - **Fixed**: Landing page `scroll-reveal-group` class missing from `scrollRef` wrapper — sections revealed simultaneously instead of cascading with 60ms stagger delays
 - **Fixed**: `.gpu-accelerated` utility had permanent `will-change: transform, opacity` — removed (class unused in codebase, but prevents accidental layer promotion)
 - **Fixed**: Accordion child reveal (`accordionChildReveal`) lacked explicit reduced-motion override — now explicitly sets `animation: none; opacity: 1` for `.accordion-content` children when `prefers-reduced-motion: reduce`
+- **Fixed**: `.page-fade-in` (used by `DirectionalPageTransition`) missing from reduced-motion overrides — page enter animation still played for users who prefer reduced motion
+- **Fixed**: Infinite animations (`animate-badge-pulse`, `skeleton-shimmer`, `shimmer-effect`) lacked explicit reduced-motion `animation: none` — relied on global `animation-duration: 0.01ms` which is fragile
+- **Fixed**: `animate-skeleton-out` and `holographic-shimmer` missing from reduced-motion opacity/transform reset — could leave elements invisible or offset for reduced-motion users
 - Files changed: `src/pages/Staff/KioskCheckin.tsx`, `server/routes/kioskCheckin.ts`, `server/routes/members/communications.ts`, `src/App.tsx`, `src/pages/Public/Landing.tsx`, `src/index.css`
 
 ## [8.90.1] - 2026-03-20
