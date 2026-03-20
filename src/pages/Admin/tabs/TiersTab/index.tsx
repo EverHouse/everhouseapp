@@ -91,6 +91,7 @@ const TiersTab: React.FC = () => {
                     />
                 )}
             </div>
+            <tab.ConfirmDialogComponent />
         </div>
     );
 };

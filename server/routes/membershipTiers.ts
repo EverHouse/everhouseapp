@@ -163,6 +163,22 @@ router.get('/api/membership-tiers/:id', async (req, res) => {
   }
 });
 
+router.get('/api/membership-tiers/:id/member-count', isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await db.execute(sql`
+      SELECT COUNT(*)::int AS count
+      FROM users
+      WHERE tier_id = ${id}
+        AND membership_status IN ('active', 'trialing', 'past_due')
+    `);
+    res.json({ count: (result.rows[0] as { count: number }).count });
+  } catch (error: unknown) {
+    logger.error('Member count fetch error', { error: getErrorMessage(error) });
+    res.status(500).json({ error: 'Failed to fetch member count' });
+  }
+});
+
 router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema), async (req, res) => {
   try {
     const { id } = req.params;

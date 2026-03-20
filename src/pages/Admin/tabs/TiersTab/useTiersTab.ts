@@ -4,11 +4,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials, putWithCredentials } from '../../../../hooks/queries/useFetch';
 import { useUndoAction } from '../../../../hooks/useUndoAction';
 import { useToast } from '../../../../components/Toast';
+import { useConfirmDialog } from '../../../../components/ConfirmDialog';
 import type { SubTab, MembershipTier, TierFeature, StripePrice, TierRecord } from './tiersTypes';
 
 export function useTiersTab() {
     const queryClient = useQueryClient();
     const { showToast } = useToast();
+    const { confirm, ConfirmDialogComponent } = useConfirmDialog();
     const [searchParams, setSearchParams] = useSearchParams();
     const subtabParam = searchParams.get('subtab');
     const activeSubTab: SubTab = subtabParam === 'fees' ? 'fees' : subtabParam === 'discounts' ? 'discounts' : subtabParam === 'cafe' ? 'cafe' : 'tiers';
@@ -347,6 +349,32 @@ export function useTiersTab() {
     const handleSave = async () => {
         if (!selectedTier) return;
         setError(null);
+
+        const originalTier = tiers.find(t => t.id === selectedTier.id);
+        const isDeactivating = !isCreating && originalTier?.is_active === true && selectedTier.is_active === false;
+
+        if (isDeactivating) {
+            try {
+                const { count } = await fetchWithCredentials<{ count: number }>(`/api/membership-tiers/${selectedTier.id}/member-count`);
+                if (count > 0) {
+                    const confirmed = await confirm({
+                        title: 'Deactivate Tier',
+                        message: `This tier has ${count} active member${count === 1 ? '' : 's'}. Deactivating it will hide it from new signups but won't affect existing members. Continue?`,
+                        confirmText: 'Deactivate',
+                        cancelText: 'Cancel',
+                        variant: 'warning',
+                    });
+                    if (!confirmed) {
+                        setSelectedTier({ ...selectedTier, is_active: true });
+                        return;
+                    }
+                }
+            } catch {
+                showToast('Failed to check active member count', 'error');
+                return;
+            }
+        }
+
         const cleanedTier = {
             ...selectedTier,
             highlighted_features: (selectedTier.highlighted_features || []).filter(f => f.trim() !== '')
@@ -420,5 +448,6 @@ export function useTiersTab() {
         handleSyncStripe,
         handlePullFromStripe,
         handleReorderFeature,
+        ConfirmDialogComponent,
     };
 }
