@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.94.1",
+    date: "2026-03-20",
+    title: "Bug Fixes & Input Validation Hardening",
+    changes: [
+      "Fixed: NFC check-in now correctly blocks archived members (previously only kiosk check-in blocked them)",
+      "Fixed: QR code scanner now validates that member IDs are numeric before sending to the server, preventing potential errors with malformed QR codes",
+      "Improved: Cafe menu, membership tier, and kiosk check-in forms now validate all input fields before processing, reducing the chance of unexpected errors",
+      "Fixed: Terminal payment cancellation and payment retry responses now return proper error status codes instead of appearing successful",
+    ]
+  },
+  {
     version: "8.94.0",
     date: "2026-03-20",
     title: "Interactive Element & Loading Polish",

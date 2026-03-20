@@ -1,5 +1,6 @@
 import { logger } from '../core/logger';
 import { Router } from 'express';
+import { z } from 'zod';
 import { isProduction } from '../core/db';
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
@@ -10,6 +11,52 @@ import { logFromRequest } from '../core/auditLog';
 import { getErrorCode, safeErrorDetail, getErrorMessage } from '../utils/errorUtils';
 import { getCached, setCache, invalidateCache as invalidateQueryCache } from '../core/queryCache';
 import { broadcastCafeMenuUpdate } from '../core/websocket';
+import { validateBody } from '../middleware/validate';
+
+const tierBaseFields = {
+  description: z.string().optional().nullable(),
+  button_text: z.string().optional().nullable(),
+  sort_order: z.number().int().optional().nullable(),
+  is_active: z.boolean().optional(),
+  is_popular: z.boolean().optional(),
+  show_in_comparison: z.boolean().optional(),
+  show_on_membership_page: z.boolean().optional(),
+  highlighted_features: z.array(z.string()).optional().nullable(),
+  all_features: z.array(z.string()).optional().nullable(),
+  daily_sim_minutes: z.number().int().optional().nullable(),
+  guest_passes_per_year: z.number().int().optional().nullable(),
+  booking_window_days: z.number().int().optional().nullable(),
+  daily_conf_room_minutes: z.number().int().optional().nullable(),
+  can_book_simulators: z.boolean().optional(),
+  can_book_conference: z.boolean().optional(),
+  can_book_wellness: z.boolean().optional(),
+  has_group_lessons: z.boolean().optional(),
+  has_extended_sessions: z.boolean().optional(),
+  has_private_lesson: z.boolean().optional(),
+  has_simulator_guest_passes: z.boolean().optional(),
+  has_discounted_merch: z.boolean().optional(),
+  unlimited_access: z.boolean().optional(),
+  stripe_price_id: z.string().optional().nullable(),
+  stripe_product_id: z.string().optional().nullable(),
+  price_cents: z.number().int().optional().nullable(),
+  wallet_pass_bg_color: z.string().optional().nullable(),
+  wallet_pass_foreground_color: z.string().optional().nullable(),
+  wallet_pass_label_color: z.string().optional().nullable(),
+};
+
+const createTierSchema = z.object({
+  name: z.string().min(1, 'Name is required'),
+  slug: z.string().min(1, 'Slug is required'),
+  price_string: z.string().min(1, 'Price is required'),
+  ...tierBaseFields,
+});
+
+const updateTierSchema = z.object({
+  name: z.string().min(1).optional(),
+  slug: z.string().min(1).optional(),
+  price_string: z.string().min(1).optional(),
+  ...tierBaseFields,
+});
 
 const TIERS_CACHE_KEY = 'membership_tiers';
 const TIERS_CACHE_TTL = 120_000;
@@ -108,7 +155,7 @@ router.get('/api/membership-tiers/:id', async (req, res) => {
   }
 });
 
-router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
+router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -177,7 +224,7 @@ router.put('/api/membership-tiers/:id', isAdmin, async (req, res) => {
   }
 });
 
-router.post('/api/membership-tiers', isAdmin, async (req, res) => {
+router.post('/api/membership-tiers', isAdmin, validateBody(createTierSchema), async (req, res) => {
   try {
     const {
       name, slug, price_string, description, button_text, sort_order,
@@ -189,10 +236,6 @@ router.post('/api/membership-tiers', isAdmin, async (req, res) => {
       unlimited_access,
       wallet_pass_bg_color, wallet_pass_foreground_color, wallet_pass_label_color
     } = req.body;
-    
-    if (!name || !slug || !price_string) {
-      return res.status(400).json({ error: 'Name, slug, and price are required' });
-    }
     
     const result = await db.execute(sql`
       INSERT INTO membership_tiers (

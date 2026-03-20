@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.94.1] - 2026-03-20
+
+### Bug Fixes & Input Validation Hardening
+- **Fixed**: NFC check-in now blocks `archived` members, matching kiosk check-in behavior. Previously archived members could bypass the block via NFC scan.
+- **Fixed**: QR code parser now validates that member IDs are numeric before returning them. Non-numeric IDs from malformed QR codes now return `unknown` instead of causing 500 errors on the backend.
+- **Fixed**: Terminal payment cancel endpoint now returns HTTP 409 (instead of 200) when the payment has already succeeded.
+- **Fixed**: Payment retry endpoint now returns HTTP 422 (instead of 200) when a retry fails, so the frontend can properly detect and handle the failure.
+- **Hardened**: Added Zod schema validation to cafe menu POST/PUT routes (`server/routes/cafe.ts`). Category and name are now required with min-length checks; price, sort_order, and booleans are type-validated.
+- **Hardened**: Added Zod schema validation to membership tier POST/PUT routes (`server/routes/membershipTiers.ts`). Name, slug, and price_string are required on create; all fields are optional on update with proper type constraints.
+- **Hardened**: Added Zod schema validation to kiosk check-in (`/api/kiosk/checkin`) and passcode verification (`/api/kiosk/verify-passcode`) routes (`server/routes/kioskCheckin.ts`).
+- Files changed: `server/routes/nfcCheckin.ts`, `server/routes/cafe.ts`, `server/routes/membershipTiers.ts`, `server/routes/kioskCheckin.ts`, `server/routes/stripe/terminal.ts`, `server/routes/stripe/payment-admin.ts`, `src/utils/qrCodeParser.ts`
+
 ## [8.93.0] - 2026-03-20
 
 ### Toast & Animation Consistency Pass

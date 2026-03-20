@@ -4,13 +4,21 @@ export interface QrParseResult {
   bookingId?: number;
 }
 
+function sanitizeMemberId(raw: string): string | undefined {
+  const trimmed = raw.trim();
+  if (!trimmed) return undefined;
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  return undefined;
+}
+
 export function parseQrCode(rawText: string): QrParseResult {
   const decodedText = rawText.trim();
   if (!decodedText) return { type: 'unknown' };
 
   const memberMatch = decodedText.match(/^MEMBER:(.+)$/);
   if (memberMatch) {
-    return { type: 'member', memberId: memberMatch[1] };
+    const memberId = sanitizeMemberId(memberMatch[1]);
+    return memberId ? { type: 'member', memberId } : { type: 'unknown' };
   }
 
   const bookingMatch = decodedText.match(/^BOOKING:(\d+)$/);
@@ -20,9 +28,10 @@ export function parseQrCode(rawText: string): QrParseResult {
 
   try {
     const url = new URL(decodedText);
-    const memberId = url.searchParams.get('memberId');
-    if (memberId) {
-      return { type: 'member', memberId };
+    const rawMemberId = url.searchParams.get('memberId');
+    if (rawMemberId) {
+      const memberId = sanitizeMemberId(rawMemberId);
+      return memberId ? { type: 'member', memberId } : { type: 'unknown' };
     }
     const bookingId = url.searchParams.get('bookingId');
     if (bookingId && /^\d+$/.test(bookingId)) {
@@ -35,7 +44,8 @@ export function parseQrCode(rawText: string): QrParseResult {
   try {
     const scanData = JSON.parse(decodedText);
     if (scanData.memberId) {
-      return { type: 'member', memberId: String(scanData.memberId) };
+      const memberId = sanitizeMemberId(String(scanData.memberId));
+      if (memberId) return { type: 'member', memberId };
     }
     if (scanData.bookingId != null) {
       const id = Number(scanData.bookingId);

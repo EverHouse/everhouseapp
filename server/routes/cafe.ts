@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { isProduction } from '../core/db';
 import { isStaffOrAdmin, isAdmin } from '../core/middleware';
 import { broadcastCafeMenuUpdate } from '../core/websocket';
@@ -9,6 +10,29 @@ import { db } from '../db';
 import { cafeItems } from '../../shared/schema';
 import { sql, eq, and, asc } from 'drizzle-orm';
 import { getCached, setCache, invalidateCache } from '../core/queryCache';
+import { validateBody } from '../middleware/validate';
+
+const cafeItemSchema = z.object({
+  category: z.string().min(1, 'Category is required'),
+  name: z.string().min(1, 'Name is required'),
+  price: z.union([z.string(), z.number()]).optional().nullable(),
+  description: z.string().optional().default(''),
+  icon: z.string().optional().default(''),
+  image_url: z.string().optional().default(''),
+  is_active: z.boolean().optional().default(true),
+  sort_order: z.number().int().optional().default(0),
+});
+
+const cafeItemUpdateSchema = z.object({
+  category: z.string().min(1).optional(),
+  name: z.string().min(1).optional(),
+  price: z.union([z.string(), z.number()]).optional().nullable(),
+  description: z.string().optional(),
+  icon: z.string().optional(),
+  image_url: z.string().optional(),
+  is_active: z.boolean().optional(),
+  sort_order: z.number().int().optional(),
+});
 
 const CAFE_CACHE_KEY = 'cafe_menu';
 const CAFE_CACHE_TTL = 60_000;
@@ -60,16 +84,12 @@ router.get('/api/cafe-menu', async (req, res) => {
   }
 });
 
-router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
+router.post('/api/cafe-menu', isStaffOrAdmin, validateBody(cafeItemSchema), async (req, res) => {
   try {
     const { category, name, price, description, icon, image_url, is_active, sort_order } = req.body;
-    
-    if (!name || !category) {
-      return res.status(400).json({ error: 'Name and category are required' });
-    }
 
-    const parsedPrice = parseFloat(price);
-    if (price !== undefined && price !== null && (isNaN(parsedPrice) || parsedPrice < 0)) {
+    const parsedPrice = parseFloat(String(price ?? 0));
+    if (isNaN(parsedPrice) || parsedPrice < 0) {
       return res.status(400).json({ error: 'Price must be a valid non-negative number' });
     }
     
@@ -94,7 +114,7 @@ router.post('/api/cafe-menu', isStaffOrAdmin, async (req, res) => {
   }
 });
 
-router.put('/api/cafe-menu/:id', isStaffOrAdmin, async (req, res) => {
+router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const numericId = Number(id);

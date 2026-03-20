@@ -347,7 +347,7 @@ router.post('/api/payments/retry', isStaffOrAdmin, validateBody(retryPaymentSche
 
       logger.info('[Payments] Retry # failed for', { extra: { newRetryCount, paymentIntentId, retryStatus } });
 
-      res.json({
+      res.status(422).json({
         success: false,
         status: retryStatus,
         retryCount: newRetryCount,

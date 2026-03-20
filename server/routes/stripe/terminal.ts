@@ -598,7 +598,7 @@ router.post('/api/stripe/terminal/cancel-payment', isStaffOrAdmin, async (req: R
         resourceName: 'terminal_payment',
         details: { readerId, paymentIntentId: paymentIntentId || null, outcome: 'already_succeeded' }
       });
-      return res.json({
+      return res.status(409).json({
         success: false,
         alreadySucceeded: true,
         message: 'Cannot cancel — payment already processed successfully'

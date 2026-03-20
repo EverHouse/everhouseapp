@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { z } from 'zod';
 import { isStaffOrAdmin } from '../core/middleware';
 import { logAndRespond, logger } from '../core/logger';
 import { getSessionUser } from '../types/session';
@@ -8,10 +9,19 @@ import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { getErrorMessage } from '../utils/errorUtils';
 import { getSettingValue } from '../core/settingsHelper';
+import { validateBody } from '../middleware/validate';
+
+const kioskCheckinSchema = z.object({
+  memberId: z.string().min(1, 'Member ID is required'),
+});
+
+const kioskPasscodeSchema = z.object({
+  passcode: z.string().min(1, 'Passcode is required'),
+});
 
 const router = Router();
 
-router.post('/api/kiosk/checkin', isStaffOrAdmin, async (req: Request, res: Response) => {
+router.post('/api/kiosk/checkin', isStaffOrAdmin, validateBody(kioskCheckinSchema), async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     if (!sessionUser?.email) {
@@ -19,9 +29,6 @@ router.post('/api/kiosk/checkin', isStaffOrAdmin, async (req: Request, res: Resp
     }
 
     const { memberId } = req.body;
-    if (!memberId || typeof memberId !== 'string') {
-      return res.status(400).json({ error: 'Member ID is required' });
-    }
 
     const memberResult = await db.execute(sql`
       SELECT id, membership_status FROM users WHERE id = ${memberId} LIMIT 1
@@ -185,7 +192,7 @@ setInterval(() => {
   }
 }, LOCKOUT_MS * 5);
 
-router.post('/api/kiosk/verify-passcode', isStaffOrAdmin, async (req: Request, res: Response) => {
+router.post('/api/kiosk/verify-passcode', isStaffOrAdmin, validateBody(kioskPasscodeSchema), async (req: Request, res: Response) => {
   try {
     const sessionUser = getSessionUser(req);
     const key = sessionUser?.email || req.ip || 'unknown';
@@ -200,9 +207,6 @@ router.post('/api/kiosk/verify-passcode', isStaffOrAdmin, async (req: Request, r
     }
 
     const { passcode } = req.body;
-    if (!passcode || typeof passcode !== 'string') {
-      return res.status(400).json({ valid: false, error: 'Passcode is required' });
-    }
 
     const storedPasscode = await getSettingValue('kiosk.exit_passcode');
     if (!storedPasscode) {
