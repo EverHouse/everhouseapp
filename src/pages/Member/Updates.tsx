@@ -12,6 +12,7 @@ import { useToast } from '../../components/Toast';
 import { haptic } from '../../utils/haptics';
 import { fetchWithCredentials, putWithCredentials } from '../../hooks/queries/useFetch';
 import Icon from '../../components/icons/Icon';
+import PageLoadingSpinner from '../../components/PageLoadingSpinner';
 
 const NOTICE_PREVIEW_DAYS = 7; // Show notices this many days before they start
 
@@ -316,18 +317,7 @@ const MemberUpdates: React.FC = () => {
   const renderAnnouncementsTab = () => (
     <div className="relative z-10 pb-32">
       {isLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`p-5 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-2 h-2 rounded-full ${isDark ? 'bg-white/20' : 'bg-gray-200'}`} />
-                <div className={`h-3 w-16 rounded ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-              </div>
-              <div className={`h-5 w-3/4 rounded mb-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-              <div className={`h-4 w-full rounded ${isDark ? 'bg-white/5' : 'bg-gray-100'}`} />
-            </div>
-          ))}
-        </div>
+        <PageLoadingSpinner />
       ) : sortedAnnouncements.length === 0 ? (
         <div className={`text-center py-16 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
           <Icon name="campaign" className="text-6xl mb-4 block mx-auto opacity-30" />
@@ -455,19 +445,7 @@ const MemberUpdates: React.FC = () => {
     return (
     <div className="relative z-10 pb-32">
       {closuresLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className={`p-5 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className={`w-10 h-10 rounded-xl ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                <div className="flex-1">
-                  <div className={`h-3 w-16 rounded mb-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                  <div className={`h-5 w-3/4 rounded ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <PageLoadingSpinner />
       ) : closures.length === 0 ? (
         <div className={`text-center py-16 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
           <Icon name="event_available" className="text-6xl mb-4 block mx-auto opacity-30" />
@@ -635,19 +613,7 @@ const MemberUpdates: React.FC = () => {
   const renderActivityTab = () => (
     <div className="relative z-10 pb-32">
       {notificationsLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className={`p-4 rounded-xl animate-pulse ${isDark ? 'bg-white/[0.03]' : 'bg-white'}`}>
-              <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                <div className="flex-1">
-                  <div className={`h-4 w-3/4 rounded mb-2 ${isDark ? 'bg-white/10' : 'bg-gray-200'}`} />
-                  <div className={`h-3 w-1/2 rounded ${isDark ? 'bg-white/5' : 'bg-gray-100'}`} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
+        <PageLoadingSpinner />
       ) : notifications.length === 0 ? (
         <div className={`text-center py-16 ${isDark ? 'text-white/70' : 'text-primary/70'}`}>
           <Icon name="notifications_none" className="text-6xl mb-4 block mx-auto opacity-30" />

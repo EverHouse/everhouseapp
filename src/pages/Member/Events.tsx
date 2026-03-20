@@ -5,7 +5,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 import { usePageReady } from '../../stores/pageReadyStore';
 import { useToast } from '../../components/Toast';
 import { fetchWithCredentials, postWithCredentials, deleteWithCredentials } from '../../hooks/queries/useFetch';
-import { EventCardSkeleton, SkeletonList } from '../../components/skeletons';
+import PageLoadingSpinner from '../../components/PageLoadingSpinner';
 import TabButton from '../../components/TabButton';
 import SwipeablePage from '../../components/SwipeablePage';
 import { MotionList, MotionListItem, AnimatedPage } from '../../components/motion';
@@ -292,7 +292,7 @@ const MemberEvents: React.FC = () => {
 
       <section key={filter} className="mb-6 animate-content-enter-delay-3">
         <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-100' : 'opacity-0 hidden'}`}>
-          <SkeletonList count={4} Component={EventCardSkeleton} isDark={isDark} className="space-y-4" />
+          <PageLoadingSpinner />
         </div>
         <div className={`transition-opacity duration-normal ${isLoading ? 'opacity-0 hidden' : 'opacity-100'}`}>
           {filteredAndSortedEvents.length === 0 ? (

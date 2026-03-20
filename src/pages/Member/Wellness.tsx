@@ -14,7 +14,7 @@ import { EmptyWellness } from '../../components/EmptyState';
 import { playSound } from '../../utils/sounds';
 import { formatDateDisplayWithDay } from '../../utils/dateUtils';
 import { bookingEvents } from '../../lib/bookingEvents';
-import { WellnessCardSkeleton, SkeletonList } from '../../components/skeletons';
+import PageLoadingSpinner from '../../components/PageLoadingSpinner';
 import Icon from '../../components/icons/Icon';
 
 interface WellnessEnrollment {
@@ -412,7 +412,7 @@ const ClassesView: React.FC<{isDark?: boolean; userEmail?: string; userStatus?: 
 
   if (isLoading) {
     return (
-      <SkeletonList count={4} Component={WellnessCardSkeleton} isDark={isDark} className="space-y-4" />
+      <PageLoadingSpinner />
     );
   }
 

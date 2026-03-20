@@ -12,6 +12,7 @@ import InvoicePaymentModal from '../../components/billing/InvoicePaymentModal';
 import { MemberPaymentModal } from '../../components/booking/MemberPaymentModal';
 import { AnimatedPage, MotionListItem } from '../../components/motion';
 import { EmptyVisits, EmptyPayments } from '../../components/EmptyState';
+import PageLoadingSpinner from '../../components/PageLoadingSpinner';
 import { TabTransition } from '../../components/motion/TabTransition';
 import Icon from '../../components/icons/Icon';
 
@@ -162,11 +163,7 @@ const History: React.FC = () => {
         <TabTransition activeKey={activeTab}>
         <div className="relative z-10 animate-content-enter-delay-3">
           {isLoading ? (
-            <div className="animate-pulse space-y-4">
-              {[1, 2, 3].map(i => (
-                <div key={i} className={`h-24 rounded-xl ${isDark ? 'bg-white/5' : 'bg-black/5'}`} />
-              ))}
-            </div>
+            <PageLoadingSpinner />
           ) : activeTab === 'visits' ? (
             <div className="space-y-4">
               <div className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-primary/80'}`}>

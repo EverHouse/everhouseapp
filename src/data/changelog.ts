@@ -12,7 +12,7 @@ export const changelog: ChangelogEntry[] = [
     date: "2026-03-20",
     title: "Interactive Element & Loading Polish",
     changes: [
-      "Improved: Page loading screens now show a larger walking golfer animation with fun, randomized golf-themed messages like 'Chasing geese off the 9th green…' and 'Taking a mulligan…'",
+      "Improved: All page loading screens — including Dashboard, Events, Wellness, History, Updates, and admin tabs — now show a larger walking golfer animation with fun, randomized golf-themed messages like 'Chasing geese off the 9th green…' and 'Taking a mulligan…'",
       "Improved: All action buttons across the member portal (Sign Out, Retry, Show More, Book with Amarie, View Membership Options, wallet pass, cancel confirmation) now have spring-physics press feedback for a more tactile feel",
       "Improved: Event cards now use spring-physics press animation instead of a basic scale transform when collapsed",
       "Improved: RSVP and Learn More buttons no longer use opacity-based hover — now use consistent color-shift hover matching the rest of the app",

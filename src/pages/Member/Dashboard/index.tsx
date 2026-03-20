@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAutoAnimate } from '@formkit/auto-animate/react';
 import { getPacificHour, CLUB_TIMEZONE } from '../../../utils/dateUtils';
-import { DashboardSkeleton } from '../../../components/skeletons';
+import PageLoadingSpinner from '../../../components/PageLoadingSpinner';
 import { SmoothReveal } from '../../../components/motion/SmoothReveal';
 import { AnimatedPage } from '../../../components/motion';
 import ClosureAlert from '../../../components/ClosureAlert';
@@ -90,7 +90,7 @@ const Dashboard: React.FC = () => {
     <SmoothReveal isLoaded={!initialLoading}>
     <div className="full-bleed-page flex flex-col">
     {initialLoading ? (
-      <DashboardSkeleton isDark={isDark} />
+      <PageLoadingSpinner />
     ) : (
     <>
     <div className="flex-1 flex flex-col">
