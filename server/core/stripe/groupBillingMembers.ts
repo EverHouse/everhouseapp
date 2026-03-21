@@ -88,6 +88,11 @@ export async function addGroupMember(params: {
       }
     }
     
+    const tierLookup = await db.execute(
+      sql`SELECT id FROM membership_tiers WHERE LOWER(name) = LOWER(${normalizedTier}) OR LOWER(slug) = LOWER(${normalizedTier}) LIMIT 1`
+    );
+    const resolvedTierId: number | null = tierLookup.rows.length > 0 ? (tierLookup.rows[0] as { id: number }).id : null;
+
     const addOnProduct = await db.select()
       .from(familyAddOnProducts)
       .where(eq(familyAddOnProducts.tierName, normalizedTier))
@@ -135,6 +140,7 @@ export async function addGroupMember(params: {
           const setFragments = [
             sql`billing_group_id = ${params.billingGroupId}`,
             sql`tier = ${normalizedTier}`,
+            sql`tier_id = ${resolvedTierId}`,
             sql`billing_provider = 'stripe'`,
             sql`membership_status = 'active'`,
             sql`membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END`,
@@ -166,8 +172,8 @@ export async function addGroupMember(params: {
           } else {
             const userId = randomUUID();
             await tx.execute(
-              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, street_address, city, state, zip_code, created_at)
-               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, 'active', 'stripe', ${params.billingGroupId}, ${params.streetAddress || null}, ${params.city || null}, ${params.state || null}, ${params.zipCode || null}, NOW())`
+              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, tier_id, membership_status, billing_provider, billing_group_id, street_address, city, state, zip_code, created_at)
+               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, ${resolvedTierId}, 'active', 'stripe', ${params.billingGroupId}, ${params.streetAddress || null}, ${params.city || null}, ${params.state || null}, ${params.zipCode || null}, NOW())`
             );
             logger.info(`[GroupBilling] Created new user ${params.memberEmail} for family group with tier ${normalizedTier}`);
           }
@@ -252,7 +258,7 @@ export async function addGroupMember(params: {
               sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${insertedMemberId}`
             );
             await db.execute(
-              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
+              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END, tier_id = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier_id END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
             logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });
@@ -329,6 +335,11 @@ export async function addCorporateMember(params: {
   }
   
   try {
+    const corpTierLookup = await db.execute(
+      sql`SELECT id FROM membership_tiers WHERE LOWER(name) = LOWER(${normalizedTier}) OR LOWER(slug) = LOWER(${normalizedTier}) LIMIT 1`
+    );
+    const corpResolvedTierId: number | null = corpTierLookup.rows.length > 0 ? (corpTierLookup.rows[0] as { id: number }).id : null;
+
     let insertedMemberId: number | null = null;
     let primaryStripeSubscriptionId: string | null = null;
     let needsStripeSync = false;
@@ -426,6 +437,7 @@ export async function addCorporateMember(params: {
           const setFragments = [
             sql`billing_group_id = ${params.billingGroupId}`,
             sql`tier = ${normalizedTier}`,
+            sql`tier_id = ${corpResolvedTierId}`,
             sql`billing_provider = 'stripe'`,
             sql`membership_status = 'active'`,
             sql`membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END`
@@ -452,8 +464,8 @@ export async function addCorporateMember(params: {
           } else {
             const userId = randomUUID();
             await tx.execute(
-              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, membership_status, billing_provider, billing_group_id, created_at)
-               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, 'active', 'stripe', ${params.billingGroupId}, NOW())`
+              sql`INSERT INTO users (id, email, first_name, last_name, phone, date_of_birth, tier, tier_id, membership_status, billing_provider, billing_group_id, created_at)
+               VALUES (${userId}, ${params.memberEmail.toLowerCase()}, ${params.firstName || null}, ${params.lastName || null}, ${params.phone || null}, ${params.dob || null}, ${normalizedTier}, ${corpResolvedTierId}, 'active', 'stripe', ${params.billingGroupId}, NOW())`
             );
             logger.info(`[GroupBilling] Created new user ${params.memberEmail} with tier ${normalizedTier}`);
           }
@@ -539,7 +551,7 @@ export async function addCorporateMember(params: {
               sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${insertedMemberId}`
             );
             await db.execute(
-              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
+              sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END, tier_id = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier_id END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
             logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });

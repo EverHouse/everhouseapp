@@ -87,16 +87,18 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
       
       let tierSlug: string | null = null;
       let tierName: string | null = null;
+      let tierId: number | null = null;
       
       const metadataTierSlug = subscription.metadata?.tier_slug || subscription.metadata?.tierSlug;
       const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
       
       if (metadataTierSlug) {
         const tierResult = await client.query(
-          'SELECT slug, name FROM membership_tiers WHERE slug = $1',
+          'SELECT id, slug, name FROM membership_tiers WHERE slug = $1',
           [metadataTierSlug]
         );
         if (tierResult.rows.length > 0) {
+          tierId = tierResult.rows[0].id;
           tierSlug = tierResult.rows[0].slug;
           tierName = tierResult.rows[0].name;
           logger.info(`[Stripe Webhook] Found tier from subscription metadata: ${tierSlug} (${tierName})`);
@@ -109,10 +111,11 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
       
       if (!tierSlug && priceId) {
         const tierResult = await client.query(
-          'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+          'SELECT id, slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
           [priceId]
         );
         if (tierResult.rows.length > 0) {
+          tierId = tierResult.rows[0].id;
           tierSlug = tierResult.rows[0].slug;
           tierName = tierResult.rows[0].name;
           logger.info(`[Stripe Webhook] Found tier from price ID: ${tierSlug} (${tierName})`);
@@ -146,10 +149,10 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             stripe_customer_id = $1, stripe_subscription_id = $2, membership_status = $3,
             membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM $3 THEN NOW() ELSE membership_status_changed_at END,
             billing_provider = 'stripe', stripe_current_period_end = COALESCE($4, stripe_current_period_end),
-            tier = COALESCE($5, tier), join_date = COALESCE(join_date, NOW()),
+            tier = COALESCE($5, tier), tier_id = CASE WHEN $5 IS NOT NULL THEN $7 ELSE COALESCE(tier_id, $7) END, join_date = COALESCE(join_date, NOW()),
             archived_at = NULL, archived_by = NULL, updated_at = NOW()
            WHERE id = $6`,
-          [customerId, subscription.id, actualStatus, subscriptionPeriodEnd, tierName, resolvedSub.userId]
+          [customerId, subscription.id, actualStatus, subscriptionPeriodEnd, tierName, resolvedSub.userId, tierId]
         );
         logger.info(`[Stripe Webhook] Updated existing user ${resolvedSub.primaryEmail} via linked email with tier ${tierName || 'none'}, subscription ${subscription.id}`);
       } else {
@@ -178,8 +181,8 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             });
           } else {
             await client.query(
-              `INSERT INTO users (email, first_name, last_name, phone, tier, membership_status, stripe_customer_id, stripe_subscription_id, billing_provider, stripe_current_period_end, join_date, created_at, updated_at)
-               VALUES ($1, $2, $3, $8, $4, $7, $5, $6, 'stripe', $9, NOW(), NOW(), NOW())
+              `INSERT INTO users (email, first_name, last_name, phone, tier, tier_id, membership_status, stripe_customer_id, stripe_subscription_id, billing_provider, stripe_current_period_end, join_date, created_at, updated_at)
+               VALUES ($1, $2, $3, $8, $4, $10, $7, $5, $6, 'stripe', $9, NOW(), NOW(), NOW())
                ON CONFLICT (email) DO UPDATE SET 
                  stripe_customer_id = EXCLUDED.stripe_customer_id,
                  stripe_subscription_id = EXCLUDED.stripe_subscription_id,
@@ -188,6 +191,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
                  billing_provider = CASE WHEN users.billing_provider IS NULL OR users.billing_provider = '' OR users.billing_provider = 'stripe' THEN 'stripe' ELSE users.billing_provider END,
                  stripe_current_period_end = COALESCE($9, users.stripe_current_period_end),
                  tier = COALESCE(EXCLUDED.tier, users.tier),
+                 tier_id = CASE WHEN EXCLUDED.tier IS NOT NULL THEN EXCLUDED.tier_id ELSE COALESCE(users.tier_id, EXCLUDED.tier_id) END,
                  role = CASE WHEN users.role IN ('admin', 'staff') THEN users.role ELSE 'member' END,
                  archived_at = NULL,
                  archived_by = NULL,
@@ -196,7 +200,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
                  last_name = COALESCE(NULLIF(EXCLUDED.last_name, ''), users.last_name),
                  phone = COALESCE(NULLIF(EXCLUDED.phone, ''), users.phone),
                  updated_at = NOW()`,
-              [customerEmail, firstName, lastName, tierName, customerId, subscription.id, actualStatus, metadataPhone || '', subscriptionPeriodEnd]
+              [customerEmail, firstName, lastName, tierName, customerId, subscription.id, actualStatus, metadataPhone || '', subscriptionPeriodEnd, tierId]
             );
             
             logger.info(`[Stripe Webhook] Created user ${customerEmail} with tier ${tierName || 'none'}, phone ${metadataPhone || 'none'}, subscription ${subscription.id}`);
@@ -419,16 +423,18 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
 
     let activationTierSlug: string | null = null;
     let activationTierName: string | null = null;
+    let activationTierId: number | null = null;
     
     const metadataTierSlug = subscription.metadata?.tier_slug || subscription.metadata?.tierSlug;
     const metadataTierName = subscription.metadata?.tier_name || subscription.metadata?.tier;
     
     if (metadataTierSlug) {
       const tierResult = await client.query(
-        'SELECT slug, name FROM membership_tiers WHERE slug = $1',
+        'SELECT id, slug, name FROM membership_tiers WHERE slug = $1',
         [metadataTierSlug]
       );
       if (tierResult.rows.length > 0) {
+        activationTierId = tierResult.rows[0].id;
         activationTierSlug = tierResult.rows[0].slug;
         activationTierName = tierResult.rows[0].name;
         logger.info(`[Stripe Webhook] Found activation tier from subscription metadata: ${activationTierSlug} (${activationTierName})`);
@@ -441,10 +447,11 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
     
     if (!activationTierSlug && priceId) {
       const tierResult = await client.query(
-        'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+        'SELECT id, slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [priceId]
       );
       if (tierResult.rows.length > 0) {
+        activationTierId = tierResult.rows[0].id;
         activationTierSlug = tierResult.rows[0].slug;
         activationTierName = tierResult.rows[0].name;
         logger.info(`[Stripe Webhook] Found activation tier from price ID: ${activationTierSlug} (${activationTierName})`);
@@ -459,6 +466,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
         const updateResult = await client.query(
           `UPDATE users SET 
             tier = $1, 
+            tier_id = $7,
             billing_provider = 'stripe',
             stripe_customer_id = COALESCE(stripe_customer_id, $3),
             stripe_subscription_id = COALESCE(stripe_subscription_id, $4),
@@ -475,7 +483,7 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             updated_at = NOW() 
           WHERE LOWER(email) = LOWER($2) 
           RETURNING id`,
-          [tierName || tierSlug, email, customerId, subscription.id, subscriptionPeriodEnd, (subscription.status === 'active' || subscription.status === 'trialing') ? 'active' : 'pending']
+          [tierName || tierSlug, email, customerId, subscription.id, subscriptionPeriodEnd, (subscription.status === 'active' || subscription.status === 'trialing') ? 'active' : 'pending', activationTierId]
         );
           
           if (updateResult.rowCount && updateResult.rowCount > 0) {
@@ -566,67 +574,91 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
             const product = await stripe.products.retrieve(deferredProductId);
             const productName = product.name?.toLowerCase() || '';
 
-            const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
-            for (const keyword of tierKeywords) {
-              if (productName.includes(keyword)) {
-                const deferredClient = await pool.connect();
-                try {
-                  const keywordTierResult = await deferredClient.query(
-                    'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
-                    [keyword]
+            let matchedTierName: string | null = null;
+            let matchedTierId: number | null = null;
+
+            const metadataProductTierId = product.metadata?.tier_id;
+            const deferredClient = await pool.connect();
+            try {
+              if (metadataProductTierId) {
+                const parsedTierId = parseInt(metadataProductTierId, 10);
+                if (!isNaN(parsedTierId)) {
+                  const metaTierResult = await deferredClient.query(
+                    'SELECT id, slug, name FROM membership_tiers WHERE id = $1',
+                    [parsedTierId]
                   );
-                  if (keywordTierResult.rows.length > 0) {
-                    const { name: tierName } = keywordTierResult.rows[0];
-
-                    const updateResult = await deferredClient.query(
-                      `UPDATE users SET 
-                        tier = $1, 
-                        membership_status = CASE 
-                          WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $4
-                          ELSE membership_status 
-                        END,
-                        membership_status_changed_at = CASE
-                          WHEN membership_status IS DISTINCT FROM $4 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned')) THEN NOW()
-                          ELSE membership_status_changed_at
-                        END,
-                        billing_provider = 'stripe',
-                        stripe_current_period_end = COALESCE($3, stripe_current_period_end),
-                        updated_at = NOW() 
-                      WHERE email = $2 
-                      RETURNING id`,
-                      [tierName, deferredEmail, deferredSubscriptionPeriodEnd, (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending']
-                    );
-
-                    if (updateResult.rowCount && updateResult.rowCount > 0) {
-                      logger.info(`[Stripe Webhook] User activation (product name match): ${deferredEmail} tier updated to ${tierName} from product "${product.name}"`);
-
-                      try {
-                        const { syncMemberToHubSpot } = await import('../../../../hubspot/stages');
-                        const mappedHubSpotStatus = (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending';
-                        const existingUserResult = await pool.query(
-                          'SELECT join_date FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
-                          [deferredEmail]
-                        );
-                        const existingJoinDate = existingUserResult.rows[0]?.join_date;
-                        await syncMemberToHubSpot({
-                          email: deferredEmail,
-                          status: mappedHubSpotStatus,
-                          billingProvider: 'stripe',
-                          tier: tierName,
-                          ...(existingJoinDate ? {} : { memberSince: new Date() }),
-                          billingGroupRole: 'Primary',
-                        });
-                        logger.info(`[Stripe Webhook] Synced ${deferredEmail} to HubSpot: tier=${tierName}, status=${mappedHubSpotStatus}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
-                      } catch (hubspotError: unknown) {
-                        logger.error('[Stripe Webhook] HubSpot sync failed for product name match:', { error: getErrorMessage(hubspotError) });
-                      }
-                    }
-                    break;
+                  if (metaTierResult.rows.length > 0) {
+                    matchedTierName = metaTierResult.rows[0].name;
+                    matchedTierId = metaTierResult.rows[0].id;
+                    logger.info(`[Stripe Webhook] Tier matched by product metadata tier_id=${metadataProductTierId} -> ${matchedTierName}`);
                   }
-                } finally {
-                  safeRelease(deferredClient);
+                } else {
+                  logger.warn(`[Stripe Webhook] Invalid non-numeric product metadata tier_id="${metadataProductTierId}", falling back to name scan`);
                 }
               }
+
+              if (!matchedTierName) {
+                const allTiersResult = await deferredClient.query(
+                  'SELECT id, slug, name FROM membership_tiers ORDER BY id'
+                );
+                for (const tier of allTiersResult.rows) {
+                  if (productName.includes(tier.slug.toLowerCase()) || productName.includes(tier.name.toLowerCase())) {
+                    matchedTierName = tier.name;
+                    matchedTierId = tier.id;
+                    logger.info(`[Stripe Webhook] Tier matched by product name "${product.name}" -> ${matchedTierName}`);
+                    break;
+                  }
+                }
+              }
+
+              if (matchedTierName) {
+                const updateResult = await deferredClient.query(
+                  `UPDATE users SET 
+                    tier = $1,
+                    tier_id = $5,
+                    membership_status = CASE 
+                      WHEN membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned') THEN $4
+                      ELSE membership_status 
+                    END,
+                    membership_status_changed_at = CASE
+                      WHEN membership_status IS DISTINCT FROM $4 AND (membership_status IS NULL OR membership_status IN ('pending', 'inactive', 'non-member', 'terminated', 'cancelled', 'expired', 'former_member', 'deleted', 'suspended', 'frozen', 'froze', 'declined', 'churned')) THEN NOW()
+                      ELSE membership_status_changed_at
+                    END,
+                    billing_provider = 'stripe',
+                    stripe_current_period_end = COALESCE($3, stripe_current_period_end),
+                    updated_at = NOW() 
+                  WHERE email = $2 
+                  RETURNING id`,
+                  [matchedTierName, deferredEmail, deferredSubscriptionPeriodEnd, (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending', matchedTierId]
+                );
+
+                if (updateResult.rowCount && updateResult.rowCount > 0) {
+                  logger.info(`[Stripe Webhook] User activation (product name match): ${deferredEmail} tier updated to ${matchedTierName} from product "${product.name}"`);
+
+                  try {
+                    const { syncMemberToHubSpot } = await import('../../../../hubspot/stages');
+                    const mappedHubSpotStatus = (deferredSubscriptionStatus === 'active' || deferredSubscriptionStatus === 'trialing') ? 'active' : 'pending';
+                    const existingUserResult = await pool.query(
+                      'SELECT join_date FROM users WHERE LOWER(email) = LOWER($1) LIMIT 1',
+                      [deferredEmail]
+                    );
+                    const existingJoinDate = existingUserResult.rows[0]?.join_date;
+                    await syncMemberToHubSpot({
+                      email: deferredEmail,
+                      status: mappedHubSpotStatus,
+                      billingProvider: 'stripe',
+                      tier: matchedTierName,
+                      ...(existingJoinDate ? {} : { memberSince: new Date() }),
+                      billingGroupRole: 'Primary',
+                    });
+                    logger.info(`[Stripe Webhook] Synced ${deferredEmail} to HubSpot: tier=${matchedTierName}, status=${mappedHubSpotStatus}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
+                  } catch (hubspotError: unknown) {
+                    logger.error('[Stripe Webhook] HubSpot sync failed for product name match:', { error: getErrorMessage(hubspotError) });
+                  }
+                }
+              }
+            } finally {
+              safeRelease(deferredClient);
             }
           } catch (productError: unknown) {
             logger.error('[Stripe Webhook] Error fetching product for name match:', { error: getErrorMessage(productError) });
@@ -643,12 +675,12 @@ export async function handleSubscriptionCreated(client: PoolClient, subscription
       
       if (priceId) {
         const tierResult = await client.query(
-          'SELECT slug FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+          'SELECT id, slug FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
           [priceId]
         );
         if (tierResult.rows.length > 0) {
-          restoreTierClause = ', tier = COALESCE(tier, $2)';
-          queryParams = [email, tierResult.rows[0].slug];
+          restoreTierClause = ', tier = COALESCE(tier, $2), tier_id = COALESCE(tier_id, $3)';
+          queryParams = [email, tierResult.rows[0].slug, tierResult.rows[0].id];
         }
       }
       

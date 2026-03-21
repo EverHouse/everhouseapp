@@ -68,15 +68,17 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
 
     if (currentPriceId) {
       const tierResult = await client.query(
-        'SELECT slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
+        'SELECT id, slug, name FROM membership_tiers WHERE stripe_price_id = $1 OR founding_price_id = $1',
         [currentPriceId]
       );
       
       let newTierName: string | null = null;
+      let newTierId: number | null = null;
       let matchMethod = 'price_id';
       
       if (tierResult.rows.length > 0) {
         newTierName = tierResult.rows[0].name;
+        newTierId = tierResult.rows[0].id;
       } else {
         const productId = subscription.items?.data?.[0]?.price?.product;
         if (productId) {
@@ -88,15 +90,33 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
             ]) as Stripe.Product;
             const productName = product.name?.toLowerCase() || '';
             
-            const tierKeywords = ['vip', 'premium', 'corporate', 'core', 'social'];
-            for (const keyword of tierKeywords) {
-              if (productName.includes(keyword)) {
-                const keywordTierResult = await client.query(
-                  'SELECT slug, name FROM membership_tiers WHERE LOWER(slug) = $1 OR LOWER(name) = $1',
-                  [keyword]
+            const metadataTierId = product.metadata?.tier_id;
+            if (metadataTierId) {
+              const parsedTierId = parseInt(metadataTierId, 10);
+              if (!isNaN(parsedTierId)) {
+                const metaTierResult = await client.query(
+                  'SELECT id, slug, name FROM membership_tiers WHERE id = $1',
+                  [parsedTierId]
                 );
-                if (keywordTierResult.rows.length > 0) {
-                  newTierName = keywordTierResult.rows[0].name;
+                if (metaTierResult.rows.length > 0) {
+                  newTierName = metaTierResult.rows[0].name;
+                  newTierId = metaTierResult.rows[0].id;
+                  matchMethod = 'product_metadata_tier_id';
+                  logger.info(`[Stripe Webhook] Tier matched by product metadata tier_id=${metadataTierId} -> ${newTierName}`);
+                }
+              } else {
+                logger.warn(`[Stripe Webhook] Invalid non-numeric product metadata tier_id="${metadataTierId}", falling back to name scan`);
+              }
+            }
+            
+            if (!newTierName) {
+              const allTiersResult = await client.query(
+                'SELECT id, slug, name FROM membership_tiers ORDER BY id'
+              );
+              for (const tier of allTiersResult.rows) {
+                if (productName.includes(tier.slug.toLowerCase()) || productName.includes(tier.name.toLowerCase())) {
+                  newTierName = tier.name;
+                  newTierId = tier.id;
                   matchMethod = 'product_name';
                   logger.info(`[Stripe Webhook] Tier matched by product name "${product.name}" -> ${newTierName}`);
                   break;
@@ -115,8 +135,8 @@ export async function handleSubscriptionUpdated(client: PoolClient, subscription
           pendingTierChange.newTier && pendingTierChange.newTier === newTierName;
 
         await client.query(
-          `UPDATE users SET tier = $1, billing_provider = $3, stripe_current_period_end = COALESCE($4, stripe_current_period_end)${shouldClearPending ? ', pending_tier_change = NULL' : ''}, updated_at = NOW() WHERE id = $2`,
-          [newTierName, userId, 'stripe', subscriptionPeriodEnd]
+          `UPDATE users SET tier = $1, tier_id = $5, billing_provider = $3, stripe_current_period_end = COALESCE($4, stripe_current_period_end)${shouldClearPending ? ', pending_tier_change = NULL' : ''}, updated_at = NOW() WHERE id = $2`,
+          [newTierName, userId, 'stripe', subscriptionPeriodEnd, newTierId]
         );
 
         if (shouldClearPending) {

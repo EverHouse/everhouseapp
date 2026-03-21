@@ -162,6 +162,7 @@ export async function handleSubscriptionDeleted(client: PoolClient, subscription
       `UPDATE users SET 
         last_tier = tier,
         tier = NULL,
+        tier_id = NULL,
         membership_status = 'cancelled',
         membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'cancelled' THEN NOW() ELSE membership_status_changed_at END,
         billing_provider = 'stripe',
