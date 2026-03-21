@@ -414,7 +414,7 @@ export async function createBookingRequest(params: {
   if (!isMemberAuthorized) {
     throw new AppError(402, 'Membership upgrade required', {
       bookingType: 'upgrade_required',
-      message: 'Simulator booking is available for Core, Premium, VIP, and Corporate members'
+      message: 'Your current membership tier does not include simulator booking access. Please upgrade your membership.'
     });
   }
   

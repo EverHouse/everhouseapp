@@ -9,8 +9,6 @@ interface TierRow {
   product_type: string | null;
 }
 
-const FALLBACK_TIERS = ['Social', 'Core', 'Premium', 'Corporate', 'VIP'];
-
 export function useTierNames() {
   const { data, isLoading } = useQuery({
     queryKey: ['tier-names-active'],
@@ -23,7 +21,7 @@ export function useTierNames() {
     ? data
         .filter(t => t.product_type === 'subscription' || t.product_type === null)
         .map(t => t.name)
-    : FALLBACK_TIERS;
+    : [];
 
   return { tiers, isLoading };
 }

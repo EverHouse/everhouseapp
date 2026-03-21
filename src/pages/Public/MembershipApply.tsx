@@ -24,22 +24,22 @@ const getHubspotCookie = (): string | null => {
   return null;
 };
 
-const FALLBACK_TIER_OPTIONS = ['Social', 'Core', 'Premium', 'Corporate'];
-
 function useTierOptions(): string[] {
   const { data } = useQuery({
     queryKey: ['apply-tier-options'],
     queryFn: async () => {
       const res = await fetch('/api/membership-tiers?active=true');
       if (!res.ok) return null;
-      return res.json() as Promise<Array<{ name: string; tier_type: string | null; show_on_membership_page: boolean }>>;
+      return res.json() as Promise<Array<{ name: string; product_type: string | null; show_on_membership_page: boolean }>>;
     },
     staleTime: 1000 * 60 * 30,
   });
 
   const tierNames = data
-    ? data.filter(t => t.show_on_membership_page).map(t => t.name)
-    : FALLBACK_TIER_OPTIONS;
+    ? data
+        .filter(t => t.show_on_membership_page && (t.product_type === 'subscription' || t.product_type === null))
+        .map(t => t.name)
+    : [];
 
   return [...tierNames, 'Not sure yet'];
 }

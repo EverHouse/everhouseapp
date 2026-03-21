@@ -12,7 +12,7 @@ import { getHubSpotClientWithFallback } from '../integrations';
 import { syncCustomerMetadataToStripe } from '../stripe/customers';
 import { getStripeClient } from '../stripe/client';
 import { logIntegrityAudit } from '../auditLog';
-import { denormalizeTierForHubSpotAsync } from '../../utils/tierUtils';
+import { denormalizeTierForHubSpotAsync, normalizeTierName } from '../../utils/tierUtils';
 import { retryableHubSpotRequest } from '../hubspot/request';
 import type {
   AuditLogDetailsRow,
@@ -323,19 +323,7 @@ export async function bulkPushToHubSpot(dryRun: boolean = true): Promise<{
 
 function hubspotTierToAppTier(hsTier: string | null): string | null {
   if (!hsTier) return null;
-  const HUBSPOT_TO_APP_TIER: Record<string, string> = {
-    'core membership': 'Core',
-    'core membership founding members': 'Core',
-    'premium membership': 'Premium',
-    'premium membership founding members': 'Premium',
-    'social membership': 'Social',
-    'social membership founding members': 'Social',
-    'vip membership': 'VIP',
-    'corporate membership': 'Corporate',
-    'group lessons membership': 'Group Lessons',
-  };
-  const match = HUBSPOT_TO_APP_TIER[hsTier.trim().toLowerCase()];
-  return match || null;
+  return normalizeTierName(hsTier);
 }
 
 export async function syncPull(params: SyncPullParams): Promise<{ success: boolean; message: string }> {

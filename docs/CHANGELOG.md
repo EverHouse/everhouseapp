@@ -2,6 +2,18 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.95.1] - 2026-03-21
+
+### Dynamic Tiers Cleanup: Hardcoded Tier Mappings, Bug Fixes, Error Handling
+- **Fixed**: MindBody import tier mapping now uses dynamic tier registry (`normalizeTierName` from `tierUtils`) instead of hardcoded 7-tier `TIER_MAPPING` lookup table.
+- **Fixed**: HubSpot integrity resolution `hubspotTierToAppTier` now uses dynamic `normalizeTierName` instead of hardcoded `HUBSPOT_TO_APP_TIER` lookup.
+- **Fixed**: Missing `getErrorMessage` import in `memberSyncRelevant.ts` — would have caused `ReferenceError` when the HubSpot email correction error branch executed.
+- **Fixed**: Simulator booking upgrade error message no longer lists specific tier names — uses generic dynamic message.
+- **Fixed**: `MembershipApply` tier options now filter by `product_type='subscription'` and use empty fallback instead of hardcoded `['Social', 'Core', 'Premium', 'Corporate']`.
+- **Fixed**: `useTierNames` hook uses empty array fallback instead of hardcoded 5-tier list — prevents stale tier names appearing before API data loads.
+- **Fixed**: All catch blocks in `server/core/hubspot/stages.ts` now use `getErrorMessage()` instead of logging raw error objects.
+- **Scope**: `server/core/mindbody/import.ts`, `server/core/integrity/resolution.ts`, `server/core/memberSyncRelevant.ts`, `server/core/resource/service.ts`, `server/core/hubspot/stages.ts`, `src/hooks/useTierNames.ts`, `src/pages/Public/MembershipApply.tsx`.
+
 ## [8.95.0] - 2026-03-20
 
 ### Dynamic Tiers: Deactivation Warning, Dynamic Names, HubSpot Auto-Sync

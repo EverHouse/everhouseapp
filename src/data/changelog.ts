@@ -8,6 +8,20 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.95.1",
+    date: "2026-03-21",
+    title: "Dynamic Tiers Cleanup: Hardcoded Tier Mappings, Bug Fixes, Error Handling",
+    changes: [
+      "Fixed: MindBody import tier mapping now uses dynamic tier registry instead of hardcoded 7-tier lookup table",
+      "Fixed: HubSpot integrity resolution tier mapping now uses dynamic normalization instead of hardcoded lookup",
+      "Fixed: Missing getErrorMessage import in memberSyncRelevant.ts — would have caused ReferenceError on HubSpot email correction errors",
+      "Fixed: Simulator booking upgrade error message no longer lists specific tier names — uses generic dynamic message",
+      "Fixed: MembershipApply tier options now filter by product_type=subscription and use empty fallback instead of hardcoded tier list",
+      "Fixed: useTierNames hook uses empty array fallback instead of hardcoded 5-tier list — prevents stale tier names from appearing",
+      "Fixed: All catch blocks in HubSpot stages.ts now use getErrorMessage() instead of logging raw error objects",
+    ]
+  },
+  {
     version: "8.95.0",
     date: "2026-03-20",
     title: "Dynamic Tiers: Deactivation Warning, Dynamic Names, HubSpot Auto-Sync",

@@ -6,21 +6,10 @@ import { alertOnImportFailure, alertOnLowMatchRate } from "../dataAlerts";
 import { findMatchingUser, normalizePhone } from "../visitors/matchingService";
 
 import { logger } from '../logger';
+import { normalizeTierName as dynamicNormalizeTierName } from '../utils/tierUtils';
 const isProduction = process.env.NODE_ENV === 'production';
 
-// Tier name mapping: Mindbody tier names → normalized tier names (Title Case for HubSpot compatibility)
-const TIER_MAPPING: Record<string, string | null> = {
-  'core membership': 'Core',
-  'core membership founding members': 'Core',
-  'premium membership': 'Premium',
-  'premium membership founding members': 'Premium',
-  'social membership': 'Social',
-  'social membership founding members': 'Social',
-  'vip membership': 'VIP',
-  'corporate membership': 'Corporate',
-  'group lessons membership': 'Group Lessons',
-  'approved pre sale clients': null, // No tier - these should be null
-};
+const MINDBODY_NULL_TIERS = new Set(['approved pre sale clients']);
 
 // Item category mapping: Mindbody item names → categories
 const ITEM_CATEGORY_MAPPING: Record<string, string> = {
@@ -58,11 +47,11 @@ function normalizePaymentMethod(method: string | undefined): string {
   return 'other';
 }
 
-// Normalize tier name from Mindbody
 function normalizeTierName(mbTier: string | undefined): string | null {
   if (!mbTier) return null;
   const lower = mbTier.toLowerCase().trim();
-  return TIER_MAPPING[lower] !== undefined ? TIER_MAPPING[lower] : mbTier.toLowerCase();
+  if (MINDBODY_NULL_TIERS.has(lower)) return null;
+  return dynamicNormalizeTierName(mbTier);
 }
 
 // Get item category from item name
