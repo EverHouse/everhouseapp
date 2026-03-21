@@ -419,7 +419,7 @@ export async function syncAllMembersFromHubSpot(): Promise<{ synced: number; err
               hubspotIdCollisions++;
             }
           } catch (dupError: unknown) {
-            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: dupError });
+            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: getErrorMessage(dupError) });
           }
           
           const hubspotNotes = contact.properties.membership_notes?.trim();

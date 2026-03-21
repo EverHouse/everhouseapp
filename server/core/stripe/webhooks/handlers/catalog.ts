@@ -1,6 +1,6 @@
 import Stripe from 'stripe';
 import { pullTierFeaturesFromStripe } from '../../products';
-import { clearTierCache } from '../../../tierService';
+import { invalidateTierRegistry } from '../../../tierRegistry';
 import { updateOverageRate, updateGuestFee } from '../../../billing/pricingConfig';
 import { logger } from '../../../logger';
 import { getErrorMessage } from '../../../../utils/errorUtils';
@@ -117,7 +117,7 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
       deferredActions.push(async () => {
         await pullTierFeaturesFromStripe();
       });
-      clearTierCache();
+      await invalidateTierRegistry();
       return deferredActions;
     }
 
@@ -188,7 +188,7 @@ export async function handleProductCreated(client: PoolClient, product: Stripe.P
             [product.id, tierId]
           );
           logger.info(`[Stripe Webhook] Linked new Stripe product ${product.id} to tier "${unlinkedTier.rows[0].name}" via tier_id metadata`);
-          clearTierCache();
+          await invalidateTierRegistry();
           deferredActions.push(async () => {
             await pullTierFeaturesFromStripe();
           });
@@ -254,7 +254,7 @@ export async function handleProductDeleted(client: PoolClient, product: Stripe.P
         logger.warn(`[Stripe Webhook] Fee/pass "${tier.name}" deactivated — Stripe product ${product.id} was deleted.`);
       }
 
-      clearTierCache();
+      await invalidateTierRegistry();
       return deferredActions;
     }
 
@@ -299,7 +299,7 @@ export async function handlePriceDeleted(client: PoolClient, price: Stripe.Price
           logger.warn(`[Stripe Webhook] Fee product "${row.name}" lost its price — re-save fees or run "Sync to Stripe" to recreate`);
         }
       }
-      clearTierCache();
+      await invalidateTierRegistry();
     }
 
     const cafeResult = await client.query(
@@ -370,10 +370,10 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
           updateGuestFee(priceCents);
         }
       }
-      clearTierCache();
+      await invalidateTierRegistry();
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling price change:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    logger.error('[Stripe Webhook] Error handling price change:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;

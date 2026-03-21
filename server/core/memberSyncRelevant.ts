@@ -433,7 +433,7 @@ export async function syncRelevantMembersFromHubSpot(): Promise<{ synced: number
               hubspotIdCollisions++;
             }
           } catch (dupError: unknown) {
-            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: dupError });
+            logger.error(`[MemberSync] Error checking for HubSpot ID collisions:`, { error: getErrorMessage(dupError) });
           }
           
           const hubspotNotes = contact.properties.membership_notes?.trim();

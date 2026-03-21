@@ -4,7 +4,7 @@ import { membershipTiers } from '../../../shared/schema';
 import { eq } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
-import { clearTierCache } from '../tierService';
+import { invalidateTierRegistry } from '../tierRegistry';
 import { getErrorMessage, getErrorCode } from '../../utils/errorUtils';
 import { logger } from '../logger';
 import { type TierRecord, type StripePaginationParams, type StripeProductWithMarketingFeatures, buildFeatureKeysForTier } from './productHelpers';
@@ -578,10 +578,10 @@ export async function pullTierFeaturesFromStripe(): Promise<{
     }
 
     logger.info(`[Reverse Sync] Tier feature pull complete: ${tiersUpdated} updated, ${errors.length} errors`);
-    clearTierCache();
+    await invalidateTierRegistry();
     return { success: errors.length === 0, tiersUpdated, errors };
   } catch (error: unknown) {
-    logger.error('[Reverse Sync] Fatal error pulling tier features:', { error: error });
+    logger.error('[Reverse Sync] Fatal error pulling tier features:', { error: getErrorMessage(error) });
     return { success: false, tiersUpdated, errors: [...errors, getErrorMessage(error)] };
   }
 }

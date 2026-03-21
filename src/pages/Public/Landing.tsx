@@ -62,7 +62,7 @@ const Landing: React.FC = () => {
     if (user) return;
     try {
       const data = await fetchWithCredentials<MembershipTier[]>('/api/membership-tiers?active=true');
-      setTiers(data.filter((t: MembershipTier) => ['social', 'core', 'corporate'].includes(t.slug)));
+      setTiers(data.filter((t: MembershipTier) => t.slug !== 'staff').slice(0, 3));
     } catch (error: unknown) {
       console.error('Failed to fetch tiers:', error);
     } finally {

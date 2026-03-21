@@ -21,6 +21,9 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: All catch blocks in HubSpot stages.ts now use getErrorMessage() instead of logging raw error objects",
       "Fixed: All catch blocks in memberSyncOperations.ts, memberSyncHelpers.ts, and memberSyncCommLogs.ts now use getErrorMessage() consistently",
       "Fixed: Missing getErrorMessage import in memberSyncCommLogs.ts — all 8 catch blocks were logging raw error objects",
+      "Fixed: Stripe catalog webhook handlers now call invalidateTierRegistry() instead of clearTierCache() — ensures normalization maps reload after Stripe-driven tier mutations",
+      "Fixed: Stripe reverse-sync (pullTierFeaturesFromStripe) now calls invalidateTierRegistry() after updating tiers from Stripe",
+      "Fixed: Landing page no longer filters tiers by hardcoded slugs — shows first 3 active tiers dynamically",
     ]
   },
   {
