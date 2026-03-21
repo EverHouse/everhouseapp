@@ -44,6 +44,7 @@ VITE_APPLE_CLIENT_ID = "members.everclub.signin"
 [userenv.development]
 DEV_LOGIN_ENABLED = "true"
 ENABLE_TEST_LOGIN = "true"
+FORCE_POOLER_REDIRECT = "true"
 
 [userenv.production]
 NODE_ENV = "production"
