@@ -240,8 +240,8 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
 
       if (tier.slug === 'simulator-overage-30min') {
         await client.query(
-          'UPDATE membership_tiers SET stripe_price_id = $1, updated_at = NOW() WHERE id = $2',
-          [price.id, tier.id]
+          'UPDATE membership_tiers SET stripe_price_id = $1, price_cents = $2, price_string = $3, updated_at = NOW() WHERE id = $4',
+          [price.id, priceCents, `$${priceDecimal}`, tier.id]
         );
         updateOverageRate(priceCents);
         logger.info(`[Stripe Webhook] Updated overage rate from Stripe price change: $${priceDecimal}`);
@@ -250,8 +250,8 @@ export async function handlePriceChange(client: PoolClient, price: Stripe.Price)
         });
       } else if (tier.slug === 'guest-pass') {
         await client.query(
-          'UPDATE membership_tiers SET stripe_price_id = $1, updated_at = NOW() WHERE id = $2',
-          [price.id, tier.id]
+          'UPDATE membership_tiers SET stripe_price_id = $1, price_cents = $2, price_string = $3, updated_at = NOW() WHERE id = $4',
+          [price.id, priceCents, `$${priceDecimal}`, tier.id]
         );
         updateGuestFee(priceCents);
         logger.info(`[Stripe Webhook] Updated guest fee from Stripe price change: $${priceDecimal}`);

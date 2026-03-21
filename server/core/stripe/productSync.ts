@@ -1,6 +1,6 @@
 import { db } from '../../db';
 import { membershipTiers, cafeItems } from '../../../shared/schema';
-import { eq, sql, and, isNotNull } from 'drizzle-orm';
+import { eq, and, isNotNull } from 'drizzle-orm';
 import { getStripeClient } from './client';
 import Stripe from 'stripe';
 import { getErrorMessage } from '../../utils/errorUtils';
