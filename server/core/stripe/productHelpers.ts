@@ -114,6 +114,9 @@ export function buildPrivilegeMetadata(tier: TierRecord): Record<string, string>
   if (tier.hasDiscountedMerch) {
     metadata.privilege_discounted_merch = 'true';
   }
+  if (tier.guestFeeCents != null) {
+    metadata.privilege_guest_fee_cents = tier.guestFeeCents.toString();
+  }
   
   if (tier.highlightedFeatures && Array.isArray(tier.highlightedFeatures) && tier.highlightedFeatures.length > 0) {
     const featuresJson = JSON.stringify(tier.highlightedFeatures.slice(0, 5));

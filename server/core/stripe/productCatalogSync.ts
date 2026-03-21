@@ -529,6 +529,7 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           guestPassesPerYear: 0,
           bookingWindowDays: tier.bookingWindowDays || 7,
           dailyConfRoomMinutes: 0,
+          guestFeeCents: tier.guestFeeCents ?? 2500,
         };
 
         for (const key of attachedKeys) {
@@ -553,6 +554,18 @@ export async function pullTierFeaturesFromStripe(): Promise<{
           } else if (key.startsWith('conf_room_minutes_')) {
             const suffix = key.replace('conf_room_minutes_', '');
             update.dailyConfRoomMinutes = suffix === 'unlimited' ? 900 : (parseInt(suffix, 10) || 0);
+          } else if (key.startsWith('guest_fee_cents_')) {
+            const suffix = key.replace('guest_fee_cents_', '');
+            const parsed = parseInt(suffix, 10);
+            update.guestFeeCents = Number.isNaN(parsed) ? 2500 : parsed;
+          }
+        }
+
+        const meta = stripeProduct.metadata || {};
+        if (update.guestFeeCents === (tier.guestFeeCents ?? 2500) && meta.privilege_guest_fee_cents !== undefined) {
+          const parsed = parseInt(meta.privilege_guest_fee_cents, 10);
+          if (!Number.isNaN(parsed)) {
+            update.guestFeeCents = parsed;
           }
         }
 

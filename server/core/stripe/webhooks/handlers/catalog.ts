@@ -73,6 +73,7 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
           { metaKey: 'privilege_private_lesson', dbCol: 'has_private_lesson', type: 'bool' },
           { metaKey: 'privilege_sim_guest_passes', dbCol: 'has_simulator_guest_passes', type: 'bool' },
           { metaKey: 'privilege_discounted_merch', dbCol: 'has_discounted_merch', type: 'bool' },
+          { metaKey: 'privilege_guest_fee_cents', dbCol: 'guest_fee_cents', type: 'int' },
         ];
 
         let hasPrivilegeMetadata = false;
@@ -98,7 +99,7 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
               }
             } else {
               tierUpdateParts.push(`${pf.dbCol} = $${paramIdx++}`);
-              tierUpdateValues.push(pf.type === 'bool' ? false : (pf.dbCol === 'booking_window_days' ? 7 : 0));
+              tierUpdateValues.push(pf.type === 'bool' ? false : (pf.dbCol === 'booking_window_days' ? 7 : pf.dbCol === 'guest_fee_cents' ? 2500 : 0));
             }
           }
           logger.info(`[Stripe Webhook] Syncing privilege metadata for tier "${tierName}" from Stripe product (missing keys reset to defaults)`);
