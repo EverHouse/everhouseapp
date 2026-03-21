@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.95.5",
+    date: "2026-03-21",
+    title: "Stripe all_features Sync: Full Round-Trip & AutoPush",
+    changes: [
+      "Fixed: Admin tier edits now sync all_features to Stripe automatically — previously only highlighted_features were pushed, requiring a manual full sync",
+      "Fixed: Rich feature objects ({label, value, included}) now survive Stripe push/pull round-trips — previously flattened to booleans",
+      "Fixed: Encoding upgraded to collision-safe v2 format (JSON payload) — v1 delimiter-based encoding could corrupt data when feature values contained special characters",
+      "Improved: Truncation at Stripe's 15-entry marketing_features cap now logs a warning with the tier name and how many features were dropped",
+    ]
+  },
+  {
     version: "8.95.4",
     date: "2026-03-21",
     title: "Architect Audit Fixes: Missing Import, Guest Pass Fail-Closed",

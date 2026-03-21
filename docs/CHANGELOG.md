@@ -2,13 +2,21 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.95.5] - 2026-03-21
+
+### Stripe all_features Sync: Full Round-Trip & AutoPush
+- **Fixed**: `autoPushTierToStripe` now reads `allFeatures`/`all_features` from the tier row and passes it to `buildMergedMarketingFeatures`, so admin tier edits automatically sync all_features to Stripe marketing_features alongside highlighted_features.
+- **Fixed**: Rich feature objects (`{label, value, included}`) now survive full push→Stripe→pull round-trips. The encoding changed from flattening to boolean (`true`/`false`) to JSON-serializing the full value.
+- **Fixed**: Encoding upgraded to collision-safe v2 format (`⌁af2:` prefix + single JSON payload containing both key and value). The v1 format (`⌁af:value⌁featureName`) used a delimiter that could appear inside JSON-encoded values, corrupting the parse boundary. v1 decoding is preserved for backward compatibility.
+- **Improved**: When `buildMergedMarketingFeatures` output exceeds Stripe's 15-entry `marketing_features` limit, a `logger.warn` now fires with the tier name and drop count. Previously truncation was silent.
+- **Improved**: Parse failures in v1 and v2 decoding now skip the entry and log a warning instead of silently coercing to `true`.
+
 ## [8.95.4] - 2026-03-21
 
 ### Architect Audit Fixes: Missing Import, Guest Pass Fail-Closed
 - **Fixed**: Missing `getErrorMessage` import in `server/core/stripe/productHelpers.ts` — the `findExistingStripeProduct` catch block called `getErrorMessage()` without importing it, which would throw a `ReferenceError` if Stripe product search failed, breaking the fallback product resolution path.
 - **Fixed**: Guest pass entitlement in `server/core/billing/guestPassConsumer.ts` now defaults to `0` passes (fail-closed) instead of `4` when tier lookup returns null. Previously, a member with no `tier_id` linkage would silently receive 4 guest passes per year. Both `consumeGuestPass()` and `canUseGuestPass()` paths affected. Added `logger.warn` when the fallback activates so operators can identify members with broken tier linkage.
-- **Known**: `all_features` Stripe encoding is lossy — `Record<string, boolean>` flattening in `buildMergedMarketingFeatures` can overwrite richer `{label,value,included}` objects, and the 15-entry marketing_features cap prevents full round-trip. Noted for future improvement.
-- **Known**: `autoPushTierToStripe` does not include `all_features` sync — only `highlighted_features` are pushed during admin tier create/update. Full sync requires separate catalog sync.
+- **Resolved in 8.95.5**: `all_features` Stripe encoding was lossy and `autoPushTierToStripe` did not include `all_features` sync. Both fixed in v8.95.5.
 
 ## [8.95.3] - 2026-03-21
 

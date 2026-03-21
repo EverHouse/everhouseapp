@@ -205,10 +205,46 @@ export function buildFeatureKeysForTier(tier: TierRecord): Array<{ lookupKey: st
   return features;
 }
 
-const ALL_FEATURES_PREFIX = '⌁af:';
-const ALL_FEATURES_SUFFIX = '⌁';
+const ALL_FEATURES_PREFIX_V1 = '⌁af:';
+const ALL_FEATURES_SUFFIX_V1 = '⌁';
+const ALL_FEATURES_PREFIX_V2 = '⌁af2:';
 
 export type AllFeatureValue = boolean | { label?: string; value?: string | boolean; included?: boolean };
+
+function encodeAllFeatureEntry(featureName: string, value: AllFeatureValue): string {
+  const payload = JSON.stringify({ k: featureName, v: value });
+  return `${ALL_FEATURES_PREFIX_V2}${payload}`;
+}
+
+function decodeV2Entry(raw: string): { featureName: string; value: AllFeatureValue } | null {
+  const json = raw.substring(ALL_FEATURES_PREFIX_V2.length);
+  try {
+    const parsed = JSON.parse(json) as { k: string; v: AllFeatureValue };
+    if (parsed.k && typeof parsed.k === 'string' && parsed.k.trim()) {
+      return { featureName: parsed.k, value: parsed.v ?? true };
+    }
+  } catch {
+    logger.warn(`[Stripe] Failed to decode v2 all_features entry, skipping: ${json.substring(0, 100)}`);
+  }
+  return null;
+}
+
+function decodeV1Entry(raw: string): { featureName: string; value: AllFeatureValue } | null {
+  const closingIdx = raw.indexOf(ALL_FEATURES_SUFFIX_V1, ALL_FEATURES_PREFIX_V1.length);
+  if (closingIdx === -1) return null;
+  const rawValue = raw.substring(ALL_FEATURES_PREFIX_V1.length, closingIdx);
+  const featureName = raw.substring(closingIdx + 1);
+  if (!featureName.trim()) return null;
+
+  if (rawValue === 'true') return { featureName, value: true };
+  if (rawValue === 'false') return { featureName, value: false };
+  try {
+    return { featureName, value: JSON.parse(rawValue) as AllFeatureValue };
+  } catch {
+    logger.warn(`[Stripe] Failed to decode v1 all_features value for "${featureName}", skipping: ${rawValue.substring(0, 100)}`);
+  }
+  return null;
+}
 
 export function buildMergedMarketingFeatures(
   highlightedFeatures: string[] | null,
@@ -228,9 +264,7 @@ export function buildMergedMarketingFeatures(
   if (allFeatures && typeof allFeatures === 'object') {
     for (const [featureName, value] of Object.entries(allFeatures)) {
       if (featureName && featureName.trim()) {
-        const encodedValue = typeof value === 'boolean' ? String(value) : JSON.stringify(value);
-        const encoded = `${ALL_FEATURES_PREFIX}${encodedValue}${ALL_FEATURES_SUFFIX}${featureName}`;
-        result.push({ name: encoded });
+        result.push({ name: encodeAllFeatureEntry(featureName, value) });
       }
     }
   }
@@ -255,25 +289,15 @@ export function parseMarketingFeatures(
   for (const f of marketingFeatures) {
     if (!f.name || !f.name.trim()) continue;
 
-    if (f.name.startsWith(ALL_FEATURES_PREFIX)) {
-      const closingIdx = f.name.indexOf(ALL_FEATURES_SUFFIX, ALL_FEATURES_PREFIX.length);
-      if (closingIdx !== -1) {
-        const rawValue = f.name.substring(ALL_FEATURES_PREFIX.length, closingIdx);
-        const featureName = f.name.substring(closingIdx + 1);
-        if (featureName.trim()) {
-          if (rawValue === 'true') {
-            allFeatures[featureName] = true;
-          } else if (rawValue === 'false') {
-            allFeatures[featureName] = false;
-          } else {
-            try {
-              allFeatures[featureName] = JSON.parse(rawValue) as AllFeatureValue;
-            } catch (e) {
-              logger.warn(`[Stripe] Failed to decode all_features value for "${featureName}", falling back to true: ${rawValue}`);
-              allFeatures[featureName] = true;
-            }
-          }
-        }
+    if (f.name.startsWith(ALL_FEATURES_PREFIX_V2)) {
+      const decoded = decodeV2Entry(f.name);
+      if (decoded) {
+        allFeatures[decoded.featureName] = decoded.value;
+      }
+    } else if (f.name.startsWith(ALL_FEATURES_PREFIX_V1)) {
+      const decoded = decodeV1Entry(f.name);
+      if (decoded) {
+        allFeatures[decoded.featureName] = decoded.value;
       }
     } else {
       highlightedFeatures.push(f.name);
