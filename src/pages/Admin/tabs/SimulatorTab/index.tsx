@@ -81,14 +81,14 @@ const SimulatorTab: React.FC = () => {
     const calendarStartDate = calendarDate;
     const calendarEndDate = calendarDate;
     
-    const weekEndDate = useMemo(() => {
+    const scheduledEndDate = useMemo(() => {
         const d = new Date(today);
-        d.setDate(d.getDate() + 7);
+        d.setDate(d.getDate() + 60);
         return d.toISOString().split('T')[0];
     }, [today]);
     
     const { data: approvedBookingsData = [], isLoading: approvedLoading } = useApprovedBookings(calendarStartDate, calendarEndDate);
-    const { data: scheduledRangeData = [] } = useApprovedBookings(today, weekEndDate);
+    const { data: scheduledRangeData = [] } = useApprovedBookings(today, scheduledEndDate);
     const { data: availabilityBlocksData = [] } = useAvailabilityBlocks(calendarDate);
     
     const isLoading = resourcesLoading || baysLoading || requestsLoading || approvedLoading;
