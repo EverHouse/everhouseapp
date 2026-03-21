@@ -8,6 +8,21 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.96.0",
+    date: "2026-03-21",
+    title: "App is Source of Truth: Stripe Webhooks No Longer Overwrite Local Data",
+    isMajor: true,
+    changes: [
+      "Changed: Stripe product.updated webhooks no longer overwrite tier name, description, features, or privileges — the app is now the authoritative source for all tier definitions",
+      "Changed: External Stripe price changes no longer overwrite tier pricing or stripe_price_id references — prevents mismatch between displayed price and charged price",
+      "Changed: Stripe product.deleted no longer deactivates tiers or deletes cafe items — it clears the Stripe link and logs a warning so you can re-sync",
+      "Changed: product.created webhook still links new Stripe products to tiers but no longer pulls features from Stripe",
+      "Kept: Subscription status (active, canceled, past due) still syncs from Stripe — because that's where payments happen",
+      "Kept: Fee product prices (overage, guest pass) still accept Stripe price updates — these are runtime config pulled from Stripe",
+      "Kept: 'Pull from Stripe' admin button still works as an emergency override — but it's a manual action, not automatic",
+    ]
+  },
+  {
     version: "8.95.6",
     date: "2026-03-21",
     title: "Stripe Webhook Hardening: Feature Clearing & Error Logging",

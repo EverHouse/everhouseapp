@@ -2,6 +2,19 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.96.0] - 2026-03-21 ⭐ MAJOR
+
+### App is Source of Truth: Stripe Webhooks No Longer Overwrite Local Data
+The app is now the authoritative source for all product catalog data (tier names, descriptions, features, privileges, pricing, cafe items). Stripe receives changes pushed from the app; webhooks no longer write product/catalog data back.
+
+- **Changed**: `handleProductUpdated` webhook handler no longer overwrites tier `name`, `description`, `highlighted_features`, `all_features`, or `privilege_*` metadata from Stripe. External Stripe edits are logged as warnings and ignored. All `pullTierFeaturesFromStripe()` deferred calls removed from webhooks.
+- **Changed**: `handlePriceChange` webhook handler no longer overwrites tier `price_cents`, `price_string`, or `stripe_price_id` from external Stripe price updates. Only fee products (overage rate, guest fee) accept external price changes. Regular tier and cafe item price changes from Stripe are logged as warnings and fully ignored — preventing a mismatch where the app displays one price but charges through a different Stripe price ID.
+- **Changed**: `handleProductDeleted` webhook handler no longer deactivates tiers (`is_active = false`) or permanently deletes cafe items when the Stripe product is deleted. Instead, it clears `stripe_product_id` and `stripe_price_id` and logs a warning to re-sync.
+- **Changed**: `handleProductCreated` webhook handler still links new Stripe products to local tiers/cafe items via metadata, but no longer triggers `pullTierFeaturesFromStripe()`.
+- **Preserved**: Subscription lifecycle webhooks (status, tier_id from subscription price) remain unchanged — Stripe is the source of truth for billing/subscription state.
+- **Preserved**: "Pull from Stripe" admin endpoint (`POST /api/admin/stripe/pull-from-stripe`) remains available as an emergency manual override.
+- **Preserved**: Corporate volume pricing config is still pulled from Stripe product metadata (this is configuration, not product catalog).
+
 ## [8.95.6] - 2026-03-21
 
 ### Stripe Webhook Hardening: Feature Clearing & Error Logging
