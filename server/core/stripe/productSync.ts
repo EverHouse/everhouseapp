@@ -437,8 +437,8 @@ export async function archiveStalePricesForProduct(stripeProductId: string, curr
         logger.warn(`[Stale Price Cleanup] Keep-price ${currentPriceId} is inactive on product ${stripeProductId}, skipping archival to avoid deactivating all prices`);
         return { archived: 0, errors: 0, skipped: true };
       }
-    } catch {
-      logger.warn(`[Stale Price Cleanup] Keep-price ${currentPriceId} not found on product ${stripeProductId}, skipping archival`);
+    } catch (err: unknown) {
+      logger.warn(`[Stale Price Cleanup] Keep-price ${currentPriceId} not found on product ${stripeProductId}, skipping archival: ${getErrorMessage(err)}`);
       return { archived: 0, errors: 0, skipped: true };
     }
 

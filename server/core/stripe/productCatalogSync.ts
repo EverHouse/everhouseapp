@@ -482,31 +482,19 @@ export async function pullTierFeaturesFromStripe(): Promise<{
         if (Array.isArray(marketingFeatures) && marketingFeatures.length > 0) {
           const parsed = parseMarketingFeatures(marketingFeatures);
 
-          if (parsed.highlightedFeatures.length > 0) {
-            await db.update(membershipTiers)
-              .set({ highlightedFeatures: parsed.highlightedFeatures })
-              .where(eq(membershipTiers.id, tier.id));
-            logger.info(`[Reverse Sync] Updated highlighted features for "${tier.name}" from ${parsed.highlightedFeatures.length} Stripe marketing features`);
-          } else {
-            await db.update(membershipTiers)
-              .set({ highlightedFeatures: [] })
-              .where(eq(membershipTiers.id, tier.id));
-            logger.info(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (Stripe marketing features empty)`);
-          }
-
-          const localAllFeatures = (tier.allFeatures as Record<string, import('./productHelpers').AllFeatureValue>) || {};
-          const mergedAllFeatures = { ...localAllFeatures, ...parsed.allFeatures };
+          const allFeaturesValue = Object.keys(parsed.allFeatures).length > 0 ? parsed.allFeatures : null;
           await db.update(membershipTiers)
-            .set({ allFeatures: mergedAllFeatures })
+            .set({
+              highlightedFeatures: parsed.highlightedFeatures,
+              allFeatures: allFeaturesValue,
+            })
             .where(eq(membershipTiers.id, tier.id));
-          if (Object.keys(parsed.allFeatures).length > 0) {
-            logger.info(`[Reverse Sync] Updated all_features for "${tier.name}" with ${Object.keys(parsed.allFeatures).length} features from Stripe (${Object.keys(mergedAllFeatures).length} total after merge)`);
-          }
+          logger.info(`[Reverse Sync] Updated features for "${tier.name}": ${parsed.highlightedFeatures.length} highlighted, ${Object.keys(parsed.allFeatures).length} all_features from Stripe`);
         } else {
           await db.update(membershipTiers)
-            .set({ highlightedFeatures: [] })
+            .set({ highlightedFeatures: [], allFeatures: null })
             .where(eq(membershipTiers.id, tier.id));
-          logger.info(`[Reverse Sync] Cleared highlighted features for "${tier.name}" (no Stripe marketing features)`);
+          logger.info(`[Reverse Sync] Cleared all features for "${tier.name}" (no Stripe marketing features)`);
         }
 
         if (attachedKeys.size === 0) {

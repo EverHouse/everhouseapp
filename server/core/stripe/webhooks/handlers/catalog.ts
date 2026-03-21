@@ -46,16 +46,20 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
         tierUpdateValues.push(product.description || null);
       }
 
-      if (Array.isArray(product.marketing_features) && product.marketing_features.length > 0) {
-        const parsed = parseMarketingFeatures(product.marketing_features);
-        tierUpdateParts.push(`highlighted_features = $${paramIdx++}`);
-        tierUpdateValues.push(JSON.stringify(parsed.highlightedFeatures));
-        if (Object.keys(parsed.allFeatures).length > 0) {
+      if (Array.isArray(product.marketing_features)) {
+        if (product.marketing_features.length > 0) {
+          const parsed = parseMarketingFeatures(product.marketing_features);
+          tierUpdateParts.push(`highlighted_features = $${paramIdx++}`);
+          tierUpdateValues.push(JSON.stringify(parsed.highlightedFeatures));
           tierUpdateParts.push(`all_features = $${paramIdx++}`);
-          tierUpdateValues.push(JSON.stringify(parsed.allFeatures));
+          tierUpdateValues.push(Object.keys(parsed.allFeatures).length > 0 ? JSON.stringify(parsed.allFeatures) : null);
           logger.info(`[Stripe Webhook] Updated features for "${tierName}": ${parsed.highlightedFeatures.length} highlighted, ${Object.keys(parsed.allFeatures).length} all_features`);
         } else {
-          logger.info(`[Stripe Webhook] Updated highlighted features for "${tierName}" from ${parsed.highlightedFeatures.length} marketing features`);
+          tierUpdateParts.push(`highlighted_features = $${paramIdx++}`);
+          tierUpdateValues.push(JSON.stringify([]));
+          tierUpdateParts.push(`all_features = $${paramIdx++}`);
+          tierUpdateValues.push(null);
+          logger.info(`[Stripe Webhook] Cleared features for "${tierName}" — marketing_features is empty`);
         }
       }
 
@@ -148,7 +152,7 @@ export async function handleProductUpdated(client: PoolClient, product: StripePr
       logger.info(`[Stripe Webhook] Updated cafe item from product ${product.id}`);
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.updated:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    logger.error('[Stripe Webhook] Error handling product.updated:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;
@@ -221,7 +225,7 @@ export async function handleProductCreated(client: PoolClient, product: Stripe.P
 
     logger.info(`[Stripe Webhook] New product ${product.id} created in Stripe — no matching local record found. Use "Pull from Stripe" to import if needed.`);
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.created:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    logger.error('[Stripe Webhook] Error handling product.created:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;
@@ -275,7 +279,7 @@ export async function handleProductDeleted(client: PoolClient, product: Stripe.P
       }
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling product.deleted:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    logger.error('[Stripe Webhook] Error handling product.deleted:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;
@@ -321,7 +325,7 @@ export async function handlePriceDeleted(client: PoolClient, price: Stripe.Price
       }
     }
   } catch (error: unknown) {
-    logger.error('[Stripe Webhook] Error handling price.deleted:', { error: error instanceof Error ? error : new Error(getErrorMessage(error)) });
+    logger.error('[Stripe Webhook] Error handling price.deleted:', { error: getErrorMessage(error) });
   }
 
   return deferredActions;

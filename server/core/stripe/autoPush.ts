@@ -305,7 +305,8 @@ export async function autoPushCafeItemToStripe(item: {
           needNewPrice = true;
           logger.info(`[AutoPush] Price changed for cafe item "${item.name}", creating new price`);
         }
-      } catch {
+      } catch (err: unknown) {
+        logger.debug(`[AutoPush] Could not retrieve price ${stripePriceId} for cafe item "${item.name}", will create new: ${getErrorMessage(err)}`);
         needNewPrice = true;
       }
     } else {
@@ -380,7 +381,8 @@ export async function autoPushFeeToStripe(slug: string, priceCents: number): Pro
           }
           needNewPrice = true;
         }
-      } catch {
+      } catch (err: unknown) {
+        logger.debug(`[AutoPush] Could not retrieve price ${stripePriceId}, will create new: ${getErrorMessage(err)}`);
         needNewPrice = true;
       }
     } else {

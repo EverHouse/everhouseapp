@@ -2,6 +2,14 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.95.6] - 2026-03-21
+
+### Stripe Webhook Hardening: Feature Clearing & Error Logging
+- **Fixed**: `handleProductUpdated` webhook handler now correctly clears `highlighted_features` and `all_features` in the database when Stripe `marketing_features` is an empty array. Previously, the handler skipped the update entirely, leaving stale feature data in the DB.
+- **Fixed**: When `marketing_features` contains highlighted features but no encoded `all_features` entries, the handler now explicitly writes `all_features = NULL` instead of leaving the old value. This prevents stale `all_features` data from persisting after a Stripe-side edit that removes them.
+- **Fixed**: `pullTierFeaturesFromStripe` reverse sync in `productCatalogSync.ts` now treats Stripe as source of truth for `all_features` instead of merging with local data. Previously, `{ ...localAllFeatures, ...parsed.allFeatures }` meant features deleted on Stripe would persist locally indefinitely. Now writes parsed Stripe data directly (or `null` when empty), and also clears `all_features` when `marketing_features` is empty/missing.
+- **Improved**: All `catch` blocks in `catalog.ts`, `autoPush.ts`, and `productSync.ts` now log the actual error detail via `getErrorMessage()`. Previously, 2 empty catch blocks in `autoPush.ts` silently swallowed price-retrieval failures, 1 block in `productSync.ts` logged a warning without the error detail, and 4 blocks in `catalog.ts` used inconsistent `instanceof Error` checks instead of the project-standard `getErrorMessage` utility.
+
 ## [8.95.5] - 2026-03-21
 
 ### Stripe all_features Sync: Full Round-Trip & AutoPush

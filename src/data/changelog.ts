@@ -8,6 +8,17 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.95.6",
+    date: "2026-03-21",
+    title: "Stripe Webhook Hardening: Feature Clearing & Error Logging",
+    changes: [
+      "Fixed: product.updated webhook now clears highlighted_features and all_features when Stripe marketing_features is empty — previously stale features persisted in the DB",
+      "Fixed: product.updated webhook now always writes both highlighted_features and all_features columns together — previously all_features was skipped when no encoded entries were present, leaving stale data",
+      "Fixed: 'Pull from Stripe' reverse sync now treats Stripe as source of truth for all_features — previously it merged local data with Stripe data, so deleted features on Stripe would persist locally",
+      "Improved: All catch blocks in catalog.ts, autoPush.ts, and productSync.ts now log error details — previously some silently swallowed errors with no diagnostic output",
+    ]
+  },
+  {
     version: "8.95.5",
     date: "2026-03-21",
     title: "Stripe all_features Sync: Full Round-Trip & AutoPush",
