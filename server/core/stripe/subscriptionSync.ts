@@ -362,7 +362,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
             action: 'error',
             reason: getErrorMessage(err),
           });
-          logger.error(`[Stripe Sync] Error processing subscription:`, { error: err });
+          logger.error(`[Stripe Sync] Error processing subscription:`, { error: getErrorMessage(err) });
         }
       }
 
@@ -375,7 +375,7 @@ export async function syncActiveSubscriptionsFromStripe(): Promise<SubscriptionS
     
     return result;
   } catch (error: unknown) {
-    logger.error('[Stripe Sync] Fatal error during sync:', { error: error });
+    logger.error('[Stripe Sync] Fatal error during sync:', { error: getErrorMessage(error) });
     result.success = false;
     result.errors.push(`Fatal error: ${getErrorMessage(error)}`);
     return result;

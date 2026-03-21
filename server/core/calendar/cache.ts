@@ -2,6 +2,7 @@ import { getGoogleCalendarClient } from '../integrations';
 import { CALENDAR_CONFIG } from './config';
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 const calendarIdCache: Record<string, string> = {};
 let cacheLastRefreshed: number = 0;
 const CACHE_TTL_MS = 30 * 60 * 1000;
@@ -45,7 +46,7 @@ export async function discoverCalendarIds(forceRefresh: boolean = false): Promis
       calendarDiscoveryLogged = true;
     }
   } catch (error: unknown) {
-    logger.error('[Calendar] Error discovering calendars:', { error: error });
+    logger.error('[Calendar] Error discovering calendars:', { error: getErrorMessage(error) });
   }
 }
 

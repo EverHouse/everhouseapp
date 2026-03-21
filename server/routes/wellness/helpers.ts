@@ -68,7 +68,7 @@ export async function getMemberDisplayName(email: string): Promise<string> {
       return [result[0].firstName, result[0].lastName].filter(Boolean).join(' ');
     }
   } catch (err: unknown) {
-    logger.warn('Failed to lookup member name', { extra: { error: err } });
+    logger.warn('Failed to lookup member name', { extra: { error: getErrorMessage(err) } });
   }
   return email.split('@')[0];
 }

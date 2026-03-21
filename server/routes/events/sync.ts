@@ -8,6 +8,7 @@ import { getAllActiveBayIds, getConferenceRoomId } from '../../core/affectedArea
 import { getSessionUser } from '../../types/session';
 import { logFromRequest, type AuditAction } from '../../core/auditLog';
 import { logger } from '../../core/logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { createEventAvailabilityBlocks } from './shared';
 
 const router = Router();
@@ -486,7 +487,7 @@ router.post('/api/admin/backfill-availability-blocks', isStaffOrAdmin, async (re
         await createEventAvailabilityBlocks(row.id, eventDate, row.start_time, row.end_time || row.start_time, row.block_simulators, row.block_conference_room, staffEmail, row.title);
         eventBlocksCreated++;
       } catch (err: unknown) {
-        logger.error(`[Backfill] Failed to create blocks for event #${row.id}`, { error: err });
+        logger.error(`[Backfill] Failed to create blocks for event #${row.id}`, { error: getErrorMessage(err) });
       }
     }
 
@@ -546,7 +547,7 @@ router.post('/api/admin/backfill-availability-blocks', isStaffOrAdmin, async (re
         }
         wellnessBlocksCreated++;
       } catch (err: unknown) {
-        logger.error(`[Backfill] Failed to create blocks for wellness class #${row.id}`, { error: err });
+        logger.error(`[Backfill] Failed to create blocks for wellness class #${row.id}`, { error: getErrorMessage(err) });
       }
     }
 

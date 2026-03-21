@@ -1,6 +1,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 export type AlertSeverity = 'critical' | 'warning' | 'info';
 export type AlertCategory = 'payment' | 'webhook' | 'system' | 'security';
@@ -54,7 +55,7 @@ export async function logAlert(event: Omit<AlertEvent, 'timestamp'>): Promise<vo
       // Table might not exist yet - that's ok
     });
   } catch (err) {
-    logger.debug('Failed to persist system alert, table may not exist', { error: err });
+    logger.debug('Failed to persist system alert, table may not exist', { error: getErrorMessage(err) });
   }
 }
 

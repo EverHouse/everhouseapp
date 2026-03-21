@@ -113,7 +113,7 @@ async function checkHubSpot(): Promise<ServiceHealth> {
     try {
       hubspotClient = await getHubSpotClient();
     } catch (err) {
-      logger.debug('HubSpot OAuth client unavailable, trying private app client', { error: err });
+      logger.debug('HubSpot OAuth client unavailable, trying private app client', { error: getErrorMessage(err) });
       const privateClient = await getHubSpotPrivateAppClient();
       if (!privateClient) {
         return {

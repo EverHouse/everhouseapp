@@ -61,12 +61,12 @@ export async function syncMemberTierFromStripe(
       await syncMemberToHubSpot({ email, tier: tierName, billingProvider: 'stripe' });
       logger.info(`[TierSync] Synced ${email} tier=${tierName} to HubSpot`);
     } catch (hubspotError) {
-      logger.error('[TierSync] HubSpot sync failed:', { error: hubspotError });
+      logger.error('[TierSync] HubSpot sync failed:', { error: getErrorMessage(hubspotError) });
     }
     
     return { success: true, newTier: tierSlug, newTierId: tierId };
   } catch (error: unknown) {
-    logger.error('[TierSync] Error syncing tier:', { error: error });
+    logger.error('[TierSync] Error syncing tier:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -119,12 +119,12 @@ export async function syncMemberStatusFromStripe(
       await syncMemberToHubSpot({ email, status: membershipStatus, billingProvider: 'stripe' });
       logger.info(`[TierSync] Synced ${email} status=${membershipStatus} to HubSpot`);
     } catch (hubspotError) {
-      logger.error('[TierSync] HubSpot sync failed:', { error: hubspotError });
+      logger.error('[TierSync] HubSpot sync failed:', { error: getErrorMessage(hubspotError) });
     }
     
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[TierSync] Error syncing status:', { error: error });
+    logger.error('[TierSync] Error syncing status:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -144,7 +144,7 @@ export async function getTierFromPriceId(stripePriceId: string): Promise<{
     
     return tierResult.rows[0] as { id: number; slug: string; name: string };
   } catch (error: unknown) {
-    logger.error('[TierSync] Error getting tier from price ID:', { error: error });
+    logger.error('[TierSync] Error getting tier from price ID:', { error: getErrorMessage(error) });
     return null;
   }
 }
@@ -188,7 +188,7 @@ export async function validateTierConsistency(email: string): Promise<{
         : undefined
     };
   } catch (error: unknown) {
-    logger.error('[TierSync] Error validating tier consistency:', { error: error });
+    logger.error('[TierSync] Error validating tier consistency:', { error: getErrorMessage(error) });
     return { isConsistent: false, issues: [getErrorMessage(error) || 'Unknown error'] };
   }
 }

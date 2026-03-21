@@ -3,13 +3,14 @@ import { discountRules } from '../../../shared/schema';
 import { eq, sql } from 'drizzle-orm';
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function getAllDiscountRules(): Promise<any[]> {
   try {
     const rules = await db.select().from(discountRules).orderBy(discountRules.discountPercent);
     return rules;
   } catch (error: unknown) {
-    logger.error('[HubSpotDeals] Error fetching discount rules:', { error: error });
+    logger.error('[HubSpotDeals] Error fetching discount rules:', { error: getErrorMessage(error) });
     return [];
   }
 }
@@ -30,7 +31,7 @@ export async function updateDiscountRule(
     
     return true;
   } catch (error: unknown) {
-    logger.error('[HubSpotDeals] Error updating discount rule:', { error: error });
+    logger.error('[HubSpotDeals] Error updating discount rule:', { error: getErrorMessage(error) });
     return false;
   }
 }
@@ -45,7 +46,7 @@ export async function getBillingAuditLog(memberEmail: string, limit: number = 50
        LIMIT ${limit}`);
     return result.rows;
   } catch (error: unknown) {
-    logger.error('[HubSpotDeals] Error fetching billing audit log:', { error: error });
+    logger.error('[HubSpotDeals] Error fetching billing audit log:', { error: getErrorMessage(error) });
     return [];
   }
 }

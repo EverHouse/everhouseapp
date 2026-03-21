@@ -233,13 +233,13 @@ export async function processStripeWebhook(
 
     if (Math.random() < 0.05) {
       cleanupOldProcessedEvents().catch(err => 
-        logger.warn('[Stripe Webhook] Background cleanup failed:', { error: err })
+        logger.warn('[Stripe Webhook] Background cleanup failed:', { error: getErrorMessage(err) })
       );
     }
 
   } catch (handlerError: unknown) {
     await client.query('ROLLBACK');
-    logger.error(`[Stripe Webhook] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: handlerError });
+    logger.error(`[Stripe Webhook] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: getErrorMessage(handlerError) });
     throw handlerError;
   } finally {
     safeRelease(client);
@@ -289,14 +289,14 @@ export async function replayStripeEvent(
 
     if (Math.random() < 0.05) {
       cleanupOldProcessedEvents().catch(err => 
-        logger.warn('[Stripe Webhook] Background cleanup failed:', { error: err })
+        logger.warn('[Stripe Webhook] Background cleanup failed:', { error: getErrorMessage(err) })
       );
     }
 
     return { success: true, eventType: event.type, message: `Successfully replayed event ${event.id} (${event.type})` };
   } catch (handlerError: unknown) {
     await client.query('ROLLBACK');
-    logger.error(`[Stripe Webhook Replay] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: handlerError });
+    logger.error(`[Stripe Webhook Replay] Handler failed for ${event.type} (${event.id}), rolled back:`, { error: getErrorMessage(handlerError) });
     throw handlerError;
   } finally {
     safeRelease(client);

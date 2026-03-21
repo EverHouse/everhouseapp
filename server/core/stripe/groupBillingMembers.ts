@@ -246,7 +246,7 @@ export async function addGroupMember(params: {
             logger.warn(`[GroupBilling] Failed to update discount_code for member: ${getErrorMessage(dcErr)}`);
           }
         } catch (stripeErr: unknown) {
-          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
+          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: getErrorMessage(stripeErr) });
           try {
             await db.execute(
               sql`UPDATE group_members SET is_active = false, removed_at = NOW() WHERE id = ${insertedMemberId}`
@@ -255,7 +255,7 @@ export async function addGroupMember(params: {
               sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
-            logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
+            logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });
           }
           return { success: false, error: `Failed to add billing: ${getErrorMessage(stripeErr)}` };
         }
@@ -267,7 +267,7 @@ export async function addGroupMember(params: {
         params.lastName || '',
         params.phone
       ).catch((err: unknown) => {
-        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
+        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: getErrorMessage(err) });
       });
 
       sendPassUpdateForMemberByEmail(params.memberEmail.toLowerCase()).catch(err =>
@@ -277,11 +277,11 @@ export async function addGroupMember(params: {
       return { success: true, memberId: insertedMemberId ?? undefined };
 
     } catch (dbErr: unknown) {
-      logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
+      logger.error('[GroupBilling] DB transaction failed:', { error: getErrorMessage(dbErr) });
       return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error adding group member:', { error: err });
+    logger.error('[GroupBilling] Error adding group member:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -522,7 +522,7 @@ export async function addCorporateMember(params: {
             logger.info('[GroupBilling] No corporate_membership item found - assuming pre-paid seats via checkout');
           }
         } catch (stripeErr: unknown) {
-          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: stripeErr });
+          logger.error('[GroupBilling] Stripe API failed, rolling back DB reservation:', { error: getErrorMessage(stripeErr) });
           if (newStripeItemId) {
             try {
               const stripeForRollback = await getStripeClient();
@@ -531,7 +531,7 @@ export async function addCorporateMember(params: {
               });
               logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
             } catch (rollbackErr: unknown) {
-              logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
+              logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: getErrorMessage(rollbackErr) });
             }
           }
           try {
@@ -542,7 +542,7 @@ export async function addCorporateMember(params: {
               sql`UPDATE users SET billing_group_id = NULL, membership_status = CASE WHEN billing_group_id = ${params.billingGroupId} THEN 'pending' ELSE membership_status END, membership_status_changed_at = CASE WHEN billing_group_id = ${params.billingGroupId} AND membership_status IS DISTINCT FROM 'pending' THEN NOW() ELSE membership_status_changed_at END, tier = CASE WHEN billing_group_id = ${params.billingGroupId} THEN NULL ELSE tier END WHERE LOWER(email) = ${params.memberEmail.toLowerCase()} AND billing_group_id = ${params.billingGroupId}`
             );
           } catch (compensateErr: unknown) {
-            logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
+            logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });
           }
           return { success: false, error: 'Failed to update billing. Please try again.' };
         }
@@ -554,7 +554,7 @@ export async function addCorporateMember(params: {
         params.lastName || '',
         params.phone
       ).catch((err: unknown) => {
-        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: err });
+        logger.error('[GroupBilling] Background HubSpot sync for sub-member failed:', { error: getErrorMessage(err) });
       });
 
       sendPassUpdateForMemberByEmail(params.memberEmail.toLowerCase()).catch(err =>
@@ -567,11 +567,11 @@ export async function addCorporateMember(params: {
       if ((dbErr as unknown as EarlyReturnError)?.__earlyReturn) {
         return (dbErr as unknown as EarlyReturnError).result;
       }
-      logger.error('[GroupBilling] DB transaction failed:', { error: dbErr });
+      logger.error('[GroupBilling] DB transaction failed:', { error: getErrorMessage(dbErr) });
       return { success: false, error: 'System error. Please try again.' };
     }
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error adding corporate member:', { error: err });
+    logger.error('[GroupBilling] Error adding corporate member:', { error: getErrorMessage(err) });
     return { success: false, error: 'Failed to add corporate member. Please try again.' };
   }
 }

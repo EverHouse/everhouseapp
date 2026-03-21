@@ -77,13 +77,13 @@ async function gracefulShutdown(signal: string) {
       try {
         const { stopSchedulers } = await import('./schedulers');
         stopSchedulers();
-      } catch (err) { logger.warn('[Shutdown] Failed to stop schedulers:', { error: err }); }
+      } catch (err) { logger.warn('[Shutdown] Failed to stop schedulers:', { error: getErrorMessage(err) }); }
     }
     if (websocketInitialized) {
       try {
         const { closeWebSocketServer } = await import('./core/websocket');
         closeWebSocketServer();
-      } catch (err) { logger.warn('[Shutdown] Failed to close WebSocket server:', { error: err }); }
+      } catch (err) { logger.warn('[Shutdown] Failed to close WebSocket server:', { error: getErrorMessage(err) }); }
     }
 
     if (httpServer) {
@@ -105,7 +105,7 @@ async function gracefulShutdown(signal: string) {
     try {
       const { pool } = await import('./core/db');
       await pool.end();
-    } catch (err) { logger.warn('[Shutdown] Failed to close database pool:', { error: err }); }
+    } catch (err) { logger.warn('[Shutdown] Failed to close database pool:', { error: getErrorMessage(err) }); }
 
     clearTimeout(shutdownTimeout);
     logger.info('[Shutdown] Complete');
@@ -308,7 +308,7 @@ async function initializeApp() {
           return;
         }
       } catch (err) {
-        logger.debug('CORS origin parsing failed', { error: err });
+        logger.debug('CORS origin parsing failed', { error: getErrorMessage(err) });
       }
       callback(new Error('Not allowed by CORS'));
     };

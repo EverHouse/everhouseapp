@@ -118,7 +118,7 @@ export async function removeCorporateMember(params: {
           }
         }
       } catch (stripeErr: unknown) {
-        logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: stripeErr });
+        logger.error('[GroupBilling] Failed to update Stripe on member removal:', { error: getErrorMessage(stripeErr) });
         if (newStripeItemId) {
           try {
             const stripeForRollback = await getStripeClient();
@@ -127,7 +127,7 @@ export async function removeCorporateMember(params: {
             });
             logger.info(`[GroupBilling] Rolled back newly created Stripe subscription item ${newStripeItemId}`);
           } catch (rollbackErr: unknown) {
-            logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: rollbackErr });
+            logger.error(`[GroupBilling] CRITICAL: Failed to delete newly created Stripe subscription item ${newStripeItemId}. Customer may be double-billed. Manual intervention required.`, { error: getErrorMessage(rollbackErr) });
           }
         }
         try {
@@ -138,7 +138,7 @@ export async function removeCorporateMember(params: {
             sql`UPDATE users SET billing_group_id = ${params.billingGroupId}, membership_status = 'active', membership_status_changed_at = CASE WHEN membership_status IS DISTINCT FROM 'active' THEN NOW() ELSE membership_status_changed_at END, tier = last_tier, last_tier = NULL, updated_at = NOW() WHERE LOWER(email) = ${params.memberEmail.toLowerCase()}`
           );
         } catch (compensateErr: unknown) {
-          logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
+          logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });
         }
         return { success: false, error: 'Failed to update billing. Please try again.' };
       }
@@ -150,7 +150,7 @@ export async function removeCorporateMember(params: {
     if ((err as unknown as EarlyReturnError)?.__earlyReturn) {
       return (err as unknown as EarlyReturnError).result;
     }
-    logger.error('[GroupBilling] Error removing corporate member:', { error: err });
+    logger.error('[GroupBilling] Error removing corporate member:', { error: getErrorMessage(err) });
     return { success: false, error: 'Failed to remove member. Please try again.' };
   }
 }
@@ -201,7 +201,7 @@ export async function removeGroupMember(params: {
         await stripe.subscriptionItems.del(stripeSubscriptionItemId);
         logger.info(`[GroupBilling] Deleted Stripe subscription item ${stripeSubscriptionItemId}`);
       } catch (stripeErr: unknown) {
-        logger.error('[GroupBilling] Failed to remove Stripe subscription item:', { error: stripeErr });
+        logger.error('[GroupBilling] Failed to remove Stripe subscription item:', { error: getErrorMessage(stripeErr) });
         try {
           await db.execute(
             sql`UPDATE group_members SET is_active = true, removed_at = NULL WHERE id = ${params.memberId}`
@@ -212,7 +212,7 @@ export async function removeGroupMember(params: {
             );
           }
         } catch (compensateErr: unknown) {
-          logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: compensateErr });
+          logger.error(`[GroupBilling] CRITICAL: Failed to compensate DB after Stripe failure. Manual intervention required.`, { error: getErrorMessage(compensateErr) });
         }
         return { success: false, error: 'Cannot remove billing. Member is still being charged. Please try again or contact support.' };
       }
@@ -224,7 +224,7 @@ export async function removeGroupMember(params: {
     if ((err as unknown as EarlyReturnError)?.__earlyReturn) {
       return (err as unknown as EarlyReturnError).result;
     }
-    logger.error('[GroupBilling] Error removing group member:', { error: err });
+    logger.error('[GroupBilling] Error removing group member:', { error: getErrorMessage(err) });
     return { success: false, error: 'Failed to remove member. Please try again.' };
   }
 }
@@ -559,7 +559,7 @@ export async function handleSubscriptionItemsChanged(
       }
     }
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error handling subscription items change:', { error: err });
+    logger.error('[GroupBilling] Error handling subscription items change:', { error: getErrorMessage(err) });
   }
 }
 
@@ -631,14 +631,14 @@ export async function handlePrimarySubscriptionCancelled(subscriptionId: string)
         }
         logger.info(`[GroupBilling] Synced ${emailsToDeactivate.length} cancelled sub-members to HubSpot`);
       } catch (hubspotErr: unknown) {
-        logger.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', { error: hubspotErr });
+        logger.error('[GroupBilling] HubSpot sync failed for cancelled sub-members:', { error: getErrorMessage(hubspotErr) });
       }
     }
 
     logger.info(`[GroupBilling] Successfully deactivated group ${groupId} and ${emailsToDeactivate.length} members`);
 
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error handling primary subscription cancellation:', { error: err });
+    logger.error('[GroupBilling] Error handling primary subscription cancellation:', { error: getErrorMessage(err) });
     throw err;
   }
 }

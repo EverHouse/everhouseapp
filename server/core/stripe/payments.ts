@@ -421,7 +421,7 @@ export async function confirmPaymentSuccess(
     logger.info(`[Stripe] Payment ${paymentIntentId} confirmed as succeeded (${result.participantsUpdated || 0} participants updated)`);
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[Stripe] Error confirming payment:', { error: error });
+    logger.error('[Stripe] Error confirming payment:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -546,7 +546,7 @@ export async function cancelPaymentIntent(
     logger.info(`[Stripe] Payment ${paymentIntentId} canceled`);
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[Stripe] Error canceling payment:', { error: error });
+    logger.error('[Stripe] Error canceling payment:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -690,7 +690,7 @@ export async function createBalanceAwarePayment(params: {
           );
           logger.info(`[Stripe] Rolled back credit consumption of $${(balanceToApply / 100).toFixed(2)} for ${email}`);
         } catch (rollbackErr: unknown) {
-          logger.error(`[Stripe] CRITICAL: Failed to roll back credit consumption for ${email}`, { error: rollbackErr });
+          logger.error(`[Stripe] CRITICAL: Failed to roll back credit consumption for ${email}`, { error: getErrorMessage(rollbackErr) });
         }
       }
       throw piError;
@@ -711,7 +711,7 @@ export async function createBalanceAwarePayment(params: {
       remainingCents,
     };
   } catch (error: unknown) {
-    logger.error(`[Stripe] Error creating balance-aware payment:`, { error: error });
+    logger.error(`[Stripe] Error creating balance-aware payment:`, { error: getErrorMessage(error) });
     return {
       paidInFull: false,
       totalCents: amountCents,
@@ -821,7 +821,7 @@ export async function chargeWithBalance(params: {
       error: paidInvoice.status !== 'paid' ? `Invoice status: ${paidInvoice.status}` : undefined,
     };
   } catch (error: unknown) {
-    logger.error(`[Stripe] Error charging ${purpose} with balance:`, { error: error });
+    logger.error(`[Stripe] Error charging ${purpose} with balance:`, { error: getErrorMessage(error) });
     return {
       success: false,
       amountFromBalance: 0,

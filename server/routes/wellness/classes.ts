@@ -403,7 +403,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
         createExtProps
       );
     } catch (calError: unknown) {
-      logger.error('Failed to create Google Calendar event for wellness class', { extra: { error: calError } });
+      logger.error('Failed to create Google Calendar event for wellness class', { extra: { error: getErrorMessage(calError) } });
       return res.status(500).json({ error: 'Failed to create calendar event. Please try again.' });
     }
     
@@ -424,7 +424,7 @@ router.post('/api/wellness-classes', isStaffOrAdmin, async (req, res) => {
         const userEmail = getSessionUser(req)?.email || 'system';
         await createWellnessAvailabilityBlocks((createdClass as unknown as WellnessClassRow).id, date, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, title);
       } catch (blockError: unknown) {
-        logger.error('Failed to create availability blocks for wellness class', { extra: { error: blockError } });
+        logger.error('Failed to create availability blocks for wellness class', { extra: { error: getErrorMessage(blockError) } });
       }
     }
     
@@ -566,7 +566,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           );
         }
       } catch (calError: unknown) {
-        logger.error('Failed to update Google Calendar event for wellness class', { extra: { error: calError } });
+        logger.error('Failed to update Google Calendar event for wellness class', { extra: { error: getErrorMessage(calError) } });
       }
     }
     
@@ -683,7 +683,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
                   recurringUserEmail, recurRow.title || updated.title
                 );
               } catch (blockError: unknown) {
-                logger.error(`Failed to create blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
+                logger.error(`Failed to create blocks for recurring wellness class ${row.id}`, { extra: { error: getErrorMessage(blockError) } });
               }
             }
           } else {
@@ -692,13 +692,13 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
               try {
                 await removeWellnessAvailabilityBlocks(row.id);
               } catch (blockError: unknown) {
-                logger.error(`Failed to remove blocks for recurring wellness class ${row.id}`, { extra: { error: blockError } });
+                logger.error(`Failed to remove blocks for recurring wellness class ${row.id}`, { extra: { error: getErrorMessage(blockError) } });
               }
             }
           }
         }
       } catch (recurError: unknown) {
-        logger.error('Failed to update recurring wellness classes', { extra: { error: recurError } });
+        logger.error('Failed to update recurring wellness classes', { extra: { error: getErrorMessage(recurError) } });
       }
     }
     
@@ -767,7 +767,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
         await updateWellnessAvailabilityBlocks(wellnessClassId, updated.date as string, startTime24, endTime24, newBlockSimulators, newBlockConferenceRoom, userEmail, updated.title as string);
       }
     } catch (blockError: unknown) {
-      logger.error('Failed to update availability blocks for wellness class', { extra: { error: blockError } });
+      logger.error('Failed to update availability blocks for wellness class', { extra: { error: getErrorMessage(blockError) } });
     }
     
     // Auto-clear needs_review if all required fields are filled
@@ -786,7 +786,7 @@ router.put('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
             Object.assign(updated, reviewedResult.rows[0]);
           }
         } catch (reviewError: unknown) {
-          logger.error('Failed to auto-clear needs_review', { extra: { error: reviewError } });
+          logger.error('Failed to auto-clear needs_review', { extra: { error: getErrorMessage(reviewError) } });
         }
       }
     }
@@ -835,7 +835,7 @@ router.get('/api/wellness-enrollments', async (req, res) => {
             );
             isStaff = ((result as unknown as { rows: unknown[] }).rows || []).length > 0;
           } catch (e: unknown) {
-            logger.warn('[wellness] Staff check query failed', { extra: { error: e } });
+            logger.warn('[wellness] Staff check query failed', { extra: { error: getErrorMessage(e) } });
           }
         }
         if (!isStaff) {
@@ -990,7 +990,7 @@ router.post('/api/wellness-enrollments', isAuthenticated, async (req, res) => {
       relatedId: class_id,
       relatedType: 'wellness_class',
       url: '/wellness'
-    }).catch(err => logger.warn('Failed to send wellness enrollment notification', { extra: { error: err } }));
+    }).catch(err => logger.warn('Failed to send wellness enrollment notification', { extra: { error: getErrorMessage(err) } }));
     const staffMessage = isWaitlisted
       ? `${memberName} joined the waitlist for ${cls.title} on ${formattedDate}`
       : `${memberName} enrolled in ${cls.title} on ${formattedDate}`;
@@ -1089,7 +1089,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
       staffMessage,
       'wellness_cancellation',
       { relatedId: class_id, relatedType: 'wellness_class', url: '/admin/calendar' }
-    ).catch(err => logger.warn('Failed to notify staff of wellness cancellation', { extra: { error: err } }));
+    ).catch(err => logger.warn('Failed to notify staff of wellness cancellation', { extra: { error: getErrorMessage(err) } }));
     
     // Delete the original "Wellness Class Confirmed" notification to avoid confusion
     try {
@@ -1100,7 +1100,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
          AND type = 'wellness_booking'`);
     } catch (cleanupErr: unknown) {
       // Non-critical - log but don't fail the cancellation
-      logger.warn('Failed to cleanup wellness confirmation notification', { extra: { error: cleanupErr } });
+      logger.warn('Failed to cleanup wellness confirmation notification', { extra: { error: getErrorMessage(cleanupErr) } });
     }
     
     await notifyMember({
@@ -1160,7 +1160,7 @@ router.delete('/api/wellness-enrollments/:class_id/:user_email', isAuthenticated
           );
         }
       } catch (promoteError: unknown) {
-        logger.error('Failed to promote waitlisted user', { extra: { error: promoteError } });
+        logger.error('Failed to promote waitlisted user', { extra: { error: getErrorMessage(promoteError) } });
       }
     }
     
@@ -1209,14 +1209,14 @@ router.delete('/api/wellness-classes/:id', isStaffOrAdmin, async (req, res) => {
           await deleteCalendarEvent((existing.rows[0] as unknown as WellnessClassRow).google_calendar_id as string, calendarId);
         }
       } catch (calError: unknown) {
-        logger.error('Failed to delete Google Calendar event for wellness class', { extra: { error: calError } });
+        logger.error('Failed to delete Google Calendar event for wellness class', { extra: { error: getErrorMessage(calError) } });
       }
     }
     
     try {
       await removeWellnessAvailabilityBlocks(wellnessClassId);
     } catch (blockError: unknown) {
-      logger.error('Failed to remove availability blocks for wellness class', { extra: { error: blockError } });
+      logger.error('Failed to remove availability blocks for wellness class', { extra: { error: getErrorMessage(blockError) } });
     }
     
     const result = await db.execute(sql`DELETE FROM wellness_classes WHERE id = ${wellnessClassId} RETURNING *`);

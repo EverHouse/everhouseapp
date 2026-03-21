@@ -2,6 +2,7 @@ import { db } from '../../db';
 import { sql } from 'drizzle-orm';
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 interface PurchaseHistoryRow {
   item_name: string;
@@ -88,7 +89,7 @@ export async function updateVisitorType({
     
     return false;
   } catch (error: unknown) {
-    logger.error('[VisitorType] Error updating visitor type:', { error: error });
+    logger.error('[VisitorType] Error updating visitor type:', { error: getErrorMessage(error) });
     return false;
   }
 }
@@ -155,7 +156,7 @@ export async function updateVisitorTypeByUserId(
     
     return false;
   } catch (error: unknown) {
-    logger.error('[VisitorType] Error updating visitor type by ID:', { error: error });
+    logger.error('[VisitorType] Error updating visitor type by ID:', { error: getErrorMessage(error) });
     return false;
   }
 }
@@ -259,7 +260,7 @@ export async function calculateVisitorTypeFromHistory(email: string): Promise<Vi
     
     return purchaseType || null;
   } catch (error: unknown) {
-    logger.error('[VisitorType] Error calculating visitor type from history:', { error: error });
+    logger.error('[VisitorType] Error calculating visitor type from history:', { error: getErrorMessage(error) });
     return null;
   }
 }

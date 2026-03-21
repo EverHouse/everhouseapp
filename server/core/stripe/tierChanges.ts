@@ -95,7 +95,7 @@ export async function previewTierChange(
       };
     }
   } catch (error: unknown) {
-    logger.error('[Tier Change] Preview error:', { error: error });
+    logger.error('[Tier Change] Preview error:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -156,7 +156,7 @@ export async function commitTierChange(
         await syncMemberToHubSpot({ email: memberEmail, tier: tier.name, billingProvider: 'stripe' });
         logger.info(`[TierChange] Synced ${memberEmail} tier=${tier.name} to HubSpot`);
       } catch (hubspotError) {
-        logger.error('[TierChange] HubSpot sync failed:', { error: hubspotError });
+        logger.error('[TierChange] HubSpot sync failed:', { error: getErrorMessage(hubspotError) });
       }
     }
     
@@ -191,7 +191,7 @@ export async function commitTierChange(
     
     return { success: true, ...(warning && { warning }) };
   } catch (error: unknown) {
-    logger.error('[Tier Change] Commit error:', { error: error });
+    logger.error('[Tier Change] Commit error:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }

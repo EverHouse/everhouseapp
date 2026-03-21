@@ -121,7 +121,7 @@ export async function createGuestPassHold(
     if (error instanceof GuestPassHoldError) {
       throw error;
     }
-    logger.error('[GuestPassHoldService] Error creating hold:', { error: error });
+    logger.error('[GuestPassHoldService] Error creating hold:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: getErrorMessage(error)
@@ -144,7 +144,7 @@ export async function releaseGuestPassHold(
     
     return { success: true, passesReleased };
   } catch (error: unknown) {
-    logger.error('[GuestPassHoldService] Error releasing hold:', { error: error });
+    logger.error('[GuestPassHoldService] Error releasing hold:', { error: getErrorMessage(error) });
     return { success: false, passesReleased: 0 };
   }
 }
@@ -199,7 +199,7 @@ export async function convertHoldToUsage(
       return { success: true, passesConverted: passesToConvert };
     });
   } catch (error: unknown) {
-    logger.error('[GuestPassHoldService] Error converting hold:', { error: error });
+    logger.error('[GuestPassHoldService] Error converting hold:', { error: getErrorMessage(error) });
     return { success: false, passesConverted: 0 };
   }
 }

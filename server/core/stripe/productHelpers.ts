@@ -43,7 +43,7 @@ export async function findExistingStripeProduct(
     
     return null;
   } catch (error: unknown) {
-    logger.error('[Stripe Products] Error searching for existing product:', { error: error });
+    logger.error('[Stripe Products] Error searching for existing product:', { error: getErrorMessage(error) });
     return null;
   }
 }

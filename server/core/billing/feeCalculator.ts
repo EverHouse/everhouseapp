@@ -120,7 +120,7 @@ export async function calculateAndCacheParticipantFees(
     
     return result;
   } catch (error: unknown) {
-    logger.error('[FeeCalculator] Error calculating fees:', { error: error });
+    logger.error('[FeeCalculator] Error calculating fees:', { error: getErrorMessage(error) });
     return {
       fees: [],
       totalCents: 0,

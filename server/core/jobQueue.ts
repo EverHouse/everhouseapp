@@ -307,10 +307,10 @@ async function executeJob(job: { id: number; jobType: string; payload: Record<st
               amountCents: payload.amountCents as number | undefined,
             });
           } catch (statusErr: unknown) {
-            logger.warn(`[JobQueue] Non-blocking: failed to mark payment refunded for PI ${payload.paymentIntentId}`, { error: statusErr });
+            logger.warn(`[JobQueue] Non-blocking: failed to mark payment refunded for PI ${payload.paymentIntentId}`, { error: getErrorMessage(statusErr) });
           }
         } catch (refundError: unknown) {
-          logger.error(`[JobQueue] Auto-refund failed for PI ${payload.paymentIntentId} — flagging for manual review`, { error: refundError });
+          logger.error(`[JobQueue] Auto-refund failed for PI ${payload.paymentIntentId} — flagging for manual review`, { error: getErrorMessage(refundError) });
           if (payload.sessionId) {
             await queryWithRetry(
               `UPDATE booking_sessions SET needs_review = true, review_reason = $1 WHERE id = $2`,
@@ -421,7 +421,7 @@ export function startJobProcessor(intervalMs: number = 5000): void {
   
   setTimeout(() => {
     processJobs().catch(err => {
-      logger.error('[JobQueue] Initial job scan error:', { error: err });
+      logger.error('[JobQueue] Initial job scan error:', { error: getErrorMessage(err) });
     });
     
     processingInterval = setInterval(async () => {
@@ -433,7 +433,7 @@ export function startJobProcessor(intervalMs: number = 5000): void {
         await processJobs();
         schedulerTracker.recordRun('Job Queue Processor', true);
       } catch (error: unknown) {
-        logger.error('[JobQueue] Processing error:', { error: error });
+        logger.error('[JobQueue] Processing error:', { error: getErrorMessage(error) });
         schedulerTracker.recordRun('Job Queue Processor', false, String(error));
       } finally {
         isProcessingJobs = false;

@@ -16,7 +16,9 @@ All notable changes to the Ever Club Members App are documented here.
 - **Fixed**: Stripe catalog webhook handlers (`catalog.ts`) now call `invalidateTierRegistry()` instead of `clearTierCache()` — ensures tier normalization maps and registry data reload after Stripe-driven tier mutations (name changes, deactivations, price updates, product links).
 - **Fixed**: `pullTierFeaturesFromStripe()` in `productCatalogSync.ts` now calls `invalidateTierRegistry()` after updating tiers from Stripe.
 - **Fixed**: Landing page tier filter no longer hardcodes `['social', 'core', 'corporate']` slugs — shows first 3 active non-staff tiers dynamically.
-- **Scope**: `server/core/mindbody/import.ts`, `server/core/integrity/resolution.ts`, `server/core/memberSyncRelevant.ts`, `server/core/memberSyncOperations.ts`, `server/core/memberSyncHelpers.ts`, `server/core/memberSyncCommLogs.ts`, `server/core/resource/service.ts`, `server/core/hubspot/stages.ts`, `server/core/stripe/webhooks/handlers/catalog.ts`, `server/core/stripe/productCatalogSync.ts`, `src/hooks/useTierNames.ts`, `src/pages/Public/Landing.tsx`, `src/pages/Public/MembershipApply.tsx`.
+- **Fixed**: Comprehensive `getErrorMessage()` sweep — all catch blocks across 45+ server files now use `getErrorMessage()` instead of logging raw error objects. Covers Stripe (customers, subscriptions, invoices, payments, webhooks, group billing, product sync, reconciliation), HubSpot (contacts, members, companies, admin), calendar (cache, availability, sync), billing (fee calculator, guest passes, payment status), visitors (auto-match, type service, matching), trackman (import, matching, webhooks), integrity checks, job queue, websocket, error alerts, monitoring, schedulers, and all route handlers.
+- **Fixed**: Removed unused `clearTierCache` imports from `catalog.ts` and `productCatalogSync.ts`.
+- **Scope**: 45+ server files across `server/core/`, `server/routes/`, and `server/schedulers/`.
 
 ## [8.95.0] - 2026-03-20
 

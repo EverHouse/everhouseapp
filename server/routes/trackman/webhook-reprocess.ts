@@ -331,7 +331,7 @@ router.post('/api/admin/bookings/:id/simulate-confirm', isStaffOrAdmin, async (r
       linkedBy: 'simulate_confirm',
       bayName: booking.resource_id ? `Bay ${booking.resource_id}` : 'Bay'
     }).catch(err => {
-      logger.warn('[Simulate Confirm] Failed to link request participants', { extra: { bookingId, error: err } });
+      logger.warn('[Simulate Confirm] Failed to link request participants', { extra: { bookingId, error: getErrorMessage(err) } });
     });
 
     logger.info('[Simulate Confirm] Booking manually confirmed', {
@@ -643,7 +643,7 @@ router.post('/api/trackman/replay-webhooks-to-dev', isAdmin, async (req, res) =>
     try {
       new URL(dev_url);
     } catch (err) {
-      logger.debug('Invalid dev_url format for replay', { error: err });
+      logger.debug('Invalid dev_url format for replay', { error: getErrorMessage(err) });
       return res.status(400).json({ error: 'Invalid dev_url format' });
     }
     

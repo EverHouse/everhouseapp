@@ -447,7 +447,7 @@ router.post('/api/admin/trackman-webhook/:eventId/auto-match', isStaffOrAdmin, a
       linkedBy: 'staff_auto_match',
       bayName: `Bay ${resourceId}`
     }).catch(err => {
-      logger.warn('[Trackman Auto-Match] Failed to link request participants', { extra: { bookingId: match.id, error: err } });
+      logger.warn('[Trackman Auto-Match] Failed to link request participants', { extra: { bookingId: match.id, error: getErrorMessage(err) } });
     });
     
     logger.info('[Trackman Auto-Match] Successfully matched and approved booking', {

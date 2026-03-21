@@ -92,7 +92,7 @@ export async function findMatchingUser(criteria: MatchCriteria): Promise<User | 
         .limit(1);
       if (linkedResult.length > 0) return linkedResult[0].user;
     } catch (err) {
-      logger.debug('userLinkedEmails table may not exist in older schemas, continuing silently', { error: err });
+      logger.debug('userLinkedEmails table may not exist in older schemas, continuing silently', { error: getErrorMessage(err) });
     }
     
     // 1c. Check manuallyLinkedEmails JSONB field for linked email match

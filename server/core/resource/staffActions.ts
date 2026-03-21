@@ -562,7 +562,7 @@ export async function createManualBooking(params: {
     actionBy: 'staff',
     staffEmail: params.staffEmail,
     isManualBooking: true
-  }, { notifyMember: true, notifyStaff: true }).catch(err => logger.error('Booking event publish failed', { extra: { error: err } }));
+  }, { notifyMember: true, notifyStaff: true }).catch(err => logger.error('Booking event publish failed', { extra: { error: getErrorMessage(err) } }));
 
   return {
     booking: {

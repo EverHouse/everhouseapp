@@ -367,7 +367,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
                 pushedToCalendar++;
               }
             } catch (pushError: unknown) {
-              logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: pushError });
+              logger.error(`[Wellness Sync] Failed to push local edits to calendar for class #${dbRow.id}:`, { error: getErrorMessage(pushError) });
             }
           }
         } else {
@@ -436,7 +436,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
     
     return { synced: events.length, created, updated, deleted, pushedToCalendar };
   } catch (error: unknown) {
-    logger.error('Error syncing Wellness Calendar events:', { error: error });
+    logger.error('Error syncing Wellness Calendar events:', { error: getErrorMessage(error) });
     
     if (!options?.suppressAlert) {
       alertOnSyncFailure(
@@ -445,7 +445,7 @@ export async function syncWellnessCalendarEvents(options?: { suppressAlert?: boo
         error instanceof Error ? error : new Error(getErrorMessage(error)),
         { calendarName: CALENDAR_CONFIG.wellness.name }
       ).catch((alertErr: unknown) => {
-        logger.error('[Wellness Sync] Failed to send staff alert:', { error: alertErr });
+        logger.error('[Wellness Sync] Failed to send staff alert:', { error: getErrorMessage(alertErr) });
       });
     }
     
@@ -564,7 +564,7 @@ export async function backfillWellnessToCalendar(): Promise<{ created: number; t
     
     return { created, total: classesWithoutCalendarRows.length, errors };
   } catch (error: unknown) {
-    logger.error('Error backfilling wellness to calendar:', { error: error });
+    logger.error('Error backfilling wellness to calendar:', { error: getErrorMessage(error) });
     return { created: 0, total: 0, errors: [`Backfill failed: ${getErrorMessage(error)}`] };
   }
 }

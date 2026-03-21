@@ -435,7 +435,7 @@ export async function createBookingForMember(
             feeInfo = ` Estimated fees: $${(Number(totalFees) / 100).toFixed(2)}.`;
           }
         } catch (e: unknown) {
-          logger.error('[Trackman Webhook] Failed to fetch fee info for notification', { extra: { error: e } });
+          logger.error('[Trackman Webhook] Failed to fetch fee info for notification', { extra: { error: getErrorMessage(e) } });
         }
       }
       
@@ -478,7 +478,7 @@ export async function createBookingForMember(
         linkedBy: 'trackman_webhook',
         bayName: bayNameForNotification
       }).catch(err => {
-        logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: pendingBookingId, error: err } });
+        logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: pendingBookingId, error: getErrorMessage(err) } });
       });
       
       return { success: true, bookingId: pendingBookingId };

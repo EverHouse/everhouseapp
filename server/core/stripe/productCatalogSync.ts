@@ -154,7 +154,7 @@ export async function syncTierFeaturesToStripe(): Promise<{
     logger.info(`[Feature Sync] Complete: ${featuresCreated} created, ${featuresAttached} attached, ${featuresRemoved} removed`);
     return { success: true, featuresCreated, featuresAttached, featuresRemoved };
   } catch (error: unknown) {
-    logger.error('[Feature Sync] Fatal error:', { error: error });
+    logger.error('[Feature Sync] Fatal error:', { error: getErrorMessage(error) });
     return { success: false, featuresCreated, featuresAttached, featuresRemoved };
   }
 }
@@ -427,7 +427,7 @@ export async function syncCafeItemsToStripe(): Promise<{
     logger.info(`[Cafe Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, synced, failed, skipped };
   } catch (error: unknown) {
-    logger.error('[Cafe Sync] Fatal error:', { error: error });
+    logger.error('[Cafe Sync] Fatal error:', { error: getErrorMessage(error) });
     return { success: false, synced, failed, skipped };
   }
 }
@@ -770,7 +770,7 @@ export async function pullCafeItemsFromStripe(): Promise<{
     logger.info(`[Reverse Sync] Cafe items pull complete: ${synced} synced, ${created} created, ${deactivated} deactivated, ${errors.length} errors`);
     return { success: errors.length === 0, synced, created, deactivated, errors };
   } catch (error: unknown) {
-    logger.error('[Reverse Sync] Fatal error pulling cafe items:', { error: error });
+    logger.error('[Reverse Sync] Fatal error pulling cafe items:', { error: getErrorMessage(error) });
     return { success: false, synced, created, deactivated, errors: [...errors, getErrorMessage(error)] };
   }
 }

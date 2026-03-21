@@ -199,7 +199,7 @@ router.post('/api/auth/apple/verify', requireAppleConfig, authRateLimiterByIp, a
 
     req.session.save((err) => {
       if (err) {
-        logger.error('[Apple Auth] Session save error', { extra: { error: err } });
+        logger.error('[Apple Auth] Session save error', { extra: { error: getErrorMessage(err) } });
         return res.status(500).json({ error: 'Failed to create session' });
       }
       res.json({ success: true, member });

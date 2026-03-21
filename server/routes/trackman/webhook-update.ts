@@ -212,7 +212,7 @@ function formatNotifDateTime(slotDate: string, time24: string): string {
     const timeStr = m === 0 ? `${h12} ${period}` : `${h12}:${String(m).padStart(2, '0')} ${period}`;
     return `${dayNames[d.getDay()]}, ${monthNames[month - 1]} ${day} at ${timeStr}`;
   } catch (err) {
-    logger.debug('Failed to format friendly date/time, using raw values', { error: err });
+    logger.debug('Failed to format friendly date/time, using raw values', { error: getErrorMessage(err) });
     return `${slotDate} at ${time24}`;
   }
 }
@@ -225,7 +225,7 @@ function calcDurationMin(startTime: string, endTime?: string): number | null {
     const diff = (eh * 60 + em) - (sh * 60 + sm);
     return diff > 0 ? diff : null;
   } catch (err) {
-    logger.debug('Failed to calculate duration from time strings', { error: err });
+    logger.debug('Failed to calculate duration from time strings', { error: getErrorMessage(err) });
     return null;
   }
 }
@@ -555,7 +555,7 @@ export async function handleBookingUpdate(payload: TrackmanWebhookPayload): Prom
       linkedBy: 'trackman_webhook',
       bayName: normalized.bayName
     }).catch(err => {
-      logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: autoApproveResult.bookingId, error: err } });
+      logger.warn('[Trackman Webhook] Failed to link request participants', { extra: { bookingId: autoApproveResult.bookingId, error: getErrorMessage(err) } });
     });
     
     logger.info('[Trackman Webhook] Auto-approved pending booking request', {

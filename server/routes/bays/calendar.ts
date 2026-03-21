@@ -6,6 +6,7 @@ import { getConferenceRoomBookingsFromCalendar } from '../../core/calendar/index
 import { isStaffOrAdmin } from '../../core/middleware';
 import { getConferenceRoomId } from '../../core/affectedAreas';
 import { logAndRespond, logger } from '../../core/logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { getSessionUser } from '../../types/session';
 import { getTodayPacific } from '../../utils/dateUtils';
 import { toIntArrayLiteral } from '../../utils/sqlArrayLiteral';
@@ -168,7 +169,7 @@ router.get('/api/approved-bookings', isStaffOrAdmin, async (req, res) => {
           source: 'calendar'
         }));
     } catch (calError) {
-      logger.error('Failed to fetch calendar conference bookings (non-blocking)', { extra: { error: calError } });
+      logger.error('Failed to fetch calendar conference bookings (non-blocking)', { extra: { error: getErrorMessage(calError) } });
     }
     
     const bookingIds = dbResult.map(b => b.id).filter(Boolean);

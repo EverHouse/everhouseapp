@@ -302,7 +302,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
                 pushedToCalendar++;
               }
             } catch (pushError: unknown) {
-              logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: pushError });
+              logger.error(`[Events Sync] Failed to push local edits to calendar for event #${dbRow.id}:`, { error: getErrorMessage(pushError) });
             }
           }
         } else {
@@ -378,7 +378,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
     
     return { synced: calendarEvents.length, created, updated, deleted, pushedToCalendar };
   } catch (error: unknown) {
-    logger.error('Error syncing Google Calendar events:', { error: error });
+    logger.error('Error syncing Google Calendar events:', { error: getErrorMessage(error) });
     
     if (!options?.suppressAlert) {
       alertOnSyncFailure(
@@ -387,7 +387,7 @@ export async function syncGoogleCalendarEvents(options?: { suppressAlert?: boole
         error instanceof Error ? error : new Error(getErrorMessage(error)),
         { calendarName: CALENDAR_CONFIG.events.name }
       ).catch((alertErr: unknown) => {
-        logger.error('[Events Sync] Failed to send staff alert:', { error: alertErr });
+        logger.error('[Events Sync] Failed to send staff alert:', { error: getErrorMessage(alertErr) });
       });
     }
     

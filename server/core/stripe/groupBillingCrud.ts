@@ -85,7 +85,7 @@ export async function getOrCreateFamilyCoupon(): Promise<string> {
       throw retrieveError;
     }
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error getting/creating FAMILY20 coupon:', { error: err });
+    logger.error('[GroupBilling] Error getting/creating FAMILY20 coupon:', { error: getErrorMessage(err) });
     throw err;
   }
 }
@@ -322,7 +322,7 @@ export async function createBillingGroup(params: {
     
     return { success: true, groupId };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error creating billing group:', { error: err });
+    logger.error('[GroupBilling] Error creating billing group:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -383,7 +383,7 @@ export async function createCorporateBillingGroupFromSubscription(params: {
     
     return { success: true, groupId };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error auto-creating corporate billing group:', { error: err });
+    logger.error('[GroupBilling] Error auto-creating corporate billing group:', { error: getErrorMessage(err) });
     return { success: false, error: getErrorMessage(err) };
   }
 }
@@ -411,7 +411,7 @@ export async function updateBillingGroupName(
     
     return { success: true };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error updating billing group name:', { error: err });
+    logger.error('[GroupBilling] Error updating billing group name:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -451,7 +451,7 @@ export async function deleteBillingGroup(
     
     return { success: true };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error deleting billing group:', { error: err });
+    logger.error('[GroupBilling] Error deleting billing group:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -470,7 +470,7 @@ export async function linkStripeSubscriptionToBillingGroup(params: {
     
     return { success: true };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error linking subscription:', { error: err });
+    logger.error('[GroupBilling] Error linking subscription:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }
@@ -526,7 +526,7 @@ export async function updateGroupAddOnPricing(params: {
             })
             .where(eq(familyAddOnProducts.id, product.id));
         } catch (stripeErr: unknown) {
-          logger.error('[GroupBilling] Error creating new Stripe price:', { error: stripeErr });
+          logger.error('[GroupBilling] Error creating new Stripe price:', { error: getErrorMessage(stripeErr) });
           return { success: false, error: getErrorMessage(stripeErr) };
         }
       } else {
@@ -541,7 +541,7 @@ export async function updateGroupAddOnPricing(params: {
     
     return { success: true };
   } catch (err: unknown) {
-    logger.error('[GroupBilling] Error updating pricing:', { error: err });
+    logger.error('[GroupBilling] Error updating pricing:', { error: getErrorMessage(err) });
     return { success: false, error: 'Operation failed. Please try again.' };
   }
 }

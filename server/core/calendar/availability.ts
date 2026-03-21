@@ -4,6 +4,7 @@ import { CALENDAR_CONFIG, getResourceConfig, TimeSlot, BusyPeriod } from './conf
 import { getCalendarIdByName } from './cache';
 
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 export async function getCalendarBusyTimes(calendarId: string, date: string): Promise<BusyPeriod[]> {
   try {
     const calendar = await getGoogleCalendarClient();
@@ -34,7 +35,7 @@ export async function getCalendarBusyTimes(calendarId: string, date: string): Pr
     
     return busyPeriods;
   } catch (error: unknown) {
-    logger.error('Error fetching busy times:', { error: error });
+    logger.error('Error fetching busy times:', { error: getErrorMessage(error) });
     return [];
   }
 }

@@ -198,7 +198,7 @@ router.post('/api/webhooks/trackman', async (req: Request, res: Response) => {
     }).then(() => {
       logger.info('[Trackman Webhook] Forwarded to dev environment');
     }).catch(err => {
-      logger.warn('[Trackman Webhook] Failed to forward to dev', { error: err });
+      logger.warn('[Trackman Webhook] Failed to forward to dev', { error: getErrorMessage(err) });
     });
   }
   

@@ -24,7 +24,7 @@ export async function getGolfInstructorEmails(): Promise<string[]> {
       .map(i => i.email?.toLowerCase())
       .filter((email): email is string => !!email);
   } catch (err: unknown) {
-    logger.error('[Trackman] Error fetching golf instructor emails:', { error: err });
+    logger.error('[Trackman] Error fetching golf instructor emails:', { error: getErrorMessage(err) });
     return [];
   }
 }

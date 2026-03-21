@@ -70,7 +70,7 @@ export async function reconcileDailyPayments() {
       statusMismatches
     };
   } catch (error: unknown) {
-    logger.error('[Reconcile] Error during reconciliation:', { error: error });
+    logger.error('[Reconcile] Error during reconciliation:', { error: getErrorMessage(error) });
     throw error;
   }
 }
@@ -248,7 +248,7 @@ export async function reconcileSubscriptions() {
             });
             logger.info(`[Reconcile] Synced ${customerEmail} to HubSpot: status=active, tier=${tierName}, billing=stripe, preservedExistingJoinDate=${!!existingJoinDate}`);
           } catch (hubspotError: unknown) {
-            logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: hubspotError });
+            logger.error(`[Reconcile] HubSpot sync failed for ${customerEmail}:`, { error: getErrorMessage(hubspotError) });
           }
 
           sendPassUpdateForMemberByEmail(customerEmail).catch(err =>
@@ -307,7 +307,7 @@ export async function reconcileSubscriptions() {
       duplicateCustomerAlerts,
     };
   } catch (error: unknown) {
-    logger.error('[Reconcile] Error during subscription reconciliation:', { error: error });
+    logger.error('[Reconcile] Error during subscription reconciliation:', { error: getErrorMessage(error) });
     throw error;
   }
 }
@@ -410,7 +410,7 @@ export async function reconcileDailyRefunds() {
       participantsHealed
     };
   } catch (error: unknown) {
-    logger.error('[Reconcile] Error during refund reconciliation:', { error: error });
+    logger.error('[Reconcile] Error during refund reconciliation:', { error: getErrorMessage(error) });
     throw error;
   }
 }

@@ -296,7 +296,7 @@ router.post('/api/data-integrity/fix/delete-empty-session', isAdmin, validateBod
   } catch (error: unknown) {
     try {
       await client.query('ROLLBACK');
-    } catch (rollbackErr) { logger.warn('[DB] Rollback failed:', { error: rollbackErr }); }
+    } catch (rollbackErr) { logger.warn('[DB] Rollback failed:', { error: getErrorMessage(rollbackErr) }); }
     logger.error('[DataIntegrity] Delete empty session error', { error: getErrorMessage(error) } as Record<string, unknown>);
     sendFixError(res, error);
   } finally {

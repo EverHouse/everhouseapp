@@ -109,7 +109,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
           }
         }
       } catch (error: unknown) {
-        logger.error(`[Discount Sync] Error syncing ${rule.discountTag}:`, { error: error });
+        logger.error(`[Discount Sync] Error syncing ${rule.discountTag}:`, { error: getErrorMessage(error) });
         results.push({
           discountTag: rule.discountTag,
           discountPercent: rule.discountPercent,
@@ -124,7 +124,7 @@ export async function syncDiscountRulesToStripeCoupons(): Promise<{
     logger.info(`[Discount Sync] Complete: ${synced} synced, ${failed} failed, ${skipped} skipped`);
     return { success: true, results, synced, failed, skipped };
   } catch (error: unknown) {
-    logger.error('[Discount Sync] Fatal error:', { error: error });
+    logger.error('[Discount Sync] Fatal error:', { error: getErrorMessage(error) });
     return { success: false, results, synced, failed, skipped };
   }
 }
@@ -165,7 +165,7 @@ export async function getDiscountSyncStatus(): Promise<Array<{
     
     return statuses;
   } catch (error: unknown) {
-    logger.error('[Discount Sync] Error getting status:', { error: error });
+    logger.error('[Discount Sync] Error getting status:', { error: getErrorMessage(error) });
     return [];
   }
 }
@@ -197,7 +197,7 @@ export async function findOrCreateCoupon(discountTag: string, discountPercent: n
       throw error;
     }
   } catch (error: unknown) {
-    logger.error(`[Discount] Error finding/creating coupon for ${discountTag}:`, { error: error });
+    logger.error(`[Discount] Error finding/creating coupon for ${discountTag}:`, { error: getErrorMessage(error) });
     return null;
   }
 }

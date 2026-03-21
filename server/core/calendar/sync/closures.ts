@@ -545,7 +545,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
                 logger.info(`[Calendar Sync] Pushed local edits to calendar for closure #${closureId} (${allEventIds.length} event(s)): ${existingClosure.title}`);
               }
             } catch (pushError: unknown) {
-              logger.error(`[Calendar Sync] Failed to push local edits to calendar for closure #${closureId}:`, { error: pushError });
+              logger.error(`[Calendar Sync] Failed to push local edits to calendar for closure #${closureId}:`, { error: getErrorMessage(pushError) });
             }
           } else if (pushedClosureIds.has(closureId)) {
             continue;
@@ -691,7 +691,7 @@ export async function syncInternalCalendarToClosures(): Promise<{ synced: number
     
     return { synced: events.length, created, updated, deleted, pushedToCalendar };
   } catch (error: unknown) {
-    logger.error('Error syncing Internal Calendar to closures:', { error: error });
+    logger.error('Error syncing Internal Calendar to closures:', { error: getErrorMessage(error) });
     return { synced: 0, created: 0, updated: 0, deleted: 0, pushedToCalendar: 0, error: 'Failed to sync closures' };
   }
 }

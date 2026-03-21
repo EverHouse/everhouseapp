@@ -130,7 +130,7 @@ router.get('/api/guest-passes/:email', isAuthenticated, async (req, res) => {
         }
       }
     } catch (err: unknown) {
-      logger.error('[GuestPasses] Error counting pending guests', { extra: { error: err } });
+      logger.error('[GuestPasses] Error counting pending guests', { extra: { error: getErrorMessage(err) } });
     }
     
     const passesRemaining = data.passesTotal - data.passesUsed;
@@ -245,7 +245,7 @@ router.put('/api/guest-passes/:email', isStaffOrAdmin, async (req, res) => {
     const data = result[0];
     const passesRemaining = data.passesTotal - data.passesUsed;
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: passesRemaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: getErrorMessage(err) } }); }
     
     logFromRequest(req, 'update_guest_passes', 'guest_pass', normalizedEmail, undefined, { passes_total: passes_total });
     res.json({
@@ -371,7 +371,7 @@ export async function refundGuestPass(
       }).catch(err => logger.error('Guest pass refund notification failed', { extra: { error: getErrorMessage(err) } }));
     }
     
-    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: err } }); }
+    try { broadcastMemberStatsUpdated(normalizedEmail, { guestPasses: remaining }); } catch (err: unknown) { logger.error('[Broadcast] Stats update error', { extra: { error: getErrorMessage(err) } }); }
 
     sendPassUpdateForMemberByEmail(normalizedEmail).catch(err =>
       logger.warn('[refundGuestPass] Wallet pass push failed (non-fatal)', { extra: { email: normalizedEmail, error: getErrorMessage(err) } })

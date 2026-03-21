@@ -168,7 +168,7 @@ export async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
   try {
     stripe = await getStripeClient();
   } catch (err: unknown) {
-    if (!isProduction) logger.error('[DataIntegrity] Stripe API error for tier reconciliation:', { error: err });
+    if (!isProduction) logger.error('[DataIntegrity] Stripe API error for tier reconciliation:', { error: getErrorMessage(err) });
     return {
       checkName: 'Tier Reconciliation',
       status: 'warning',
@@ -190,7 +190,7 @@ export async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
     const hsResult = await getHubSpotClientWithFallback();
     hubspot = hsResult.client;
   } catch (err: unknown) {
-    if (!isProduction) logger.error('[DataIntegrity] HubSpot API error for tier reconciliation:', { error: err });
+    if (!isProduction) logger.error('[DataIntegrity] HubSpot API error for tier reconciliation:', { error: getErrorMessage(err) });
   }
 
   const appMembersResult = await db.execute(sql`
@@ -231,7 +231,7 @@ export async function checkTierReconciliation(): Promise<IntegrityCheckResult> {
           hubspotTierMap.set(contact.id, (contact.properties?.membership_tier || '').toLowerCase().trim());
         }
       } catch (batchErr: unknown) {
-        logger.warn('[DataIntegrity] HubSpot batch tier read failed:', { error: batchErr });
+        logger.warn('[DataIntegrity] HubSpot batch tier read failed:', { error: getErrorMessage(batchErr) });
       }
     }
   }

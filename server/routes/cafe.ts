@@ -123,11 +123,11 @@ router.post('/api/cafe-menu', isStaffOrAdmin, validateBody(cafeItemSchema), asyn
       synced = pushResult.success;
       if (!pushResult.success) {
         syncError = pushResult.error || 'Stripe sync failed';
-        logger.error('[AutoPush] Cafe item creation push failed', { error: syncError });
+        logger.error('[AutoPush] Cafe item creation push failed', { error: getErrorMessage(syncError) });
       }
     } catch (err) {
       syncError = getErrorMessage(err);
-      logger.error('[AutoPush] Cafe item creation push exception', { error: syncError });
+      logger.error('[AutoPush] Cafe item creation push exception', { error: getErrorMessage(syncError) });
     }
 
     invalidateCache(CAFE_CACHE_KEY);
@@ -191,11 +191,11 @@ router.put('/api/cafe-menu/:id', isStaffOrAdmin, validateBody(cafeItemUpdateSche
       synced = pushResult.success;
       if (!pushResult.success) {
         syncError = pushResult.error || 'Stripe sync failed';
-        logger.error('[AutoPush] Cafe item push failed', { error: syncError });
+        logger.error('[AutoPush] Cafe item push failed', { error: getErrorMessage(syncError) });
       }
     } catch (err) {
       syncError = getErrorMessage(err);
-      logger.error('[AutoPush] Cafe item push exception', { error: syncError });
+      logger.error('[AutoPush] Cafe item push exception', { error: getErrorMessage(syncError) });
     }
 
     invalidateCache(CAFE_CACHE_KEY);

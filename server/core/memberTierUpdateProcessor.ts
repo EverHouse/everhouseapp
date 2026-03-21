@@ -150,7 +150,7 @@ export async function processMemberTierUpdate(payload: MemberTierUpdatePayload):
 
     logger.info(`[MemberTierUpdateProcessor] Successfully updated ${normalizedEmail}: ${oldTier || 'None'} → ${newTier}`);
   } catch (error: unknown) {
-    logger.error(`[MemberTierUpdateProcessor] Error updating tier for ${normalizedEmail}:`, { error: error });
+    logger.error(`[MemberTierUpdateProcessor] Error updating tier for ${normalizedEmail}:`, { error: getErrorMessage(error) });
     throw error;
   }
 }

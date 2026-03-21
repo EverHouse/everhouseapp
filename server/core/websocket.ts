@@ -261,7 +261,7 @@ function isAllowedOrigin(origin: string | undefined): boolean {
     
     return false;
   } catch (err) {
-    logger.debug('Origin validation failed', { error: err });
+    logger.debug('Origin validation failed', { error: getErrorMessage(err) });
     return false;
   }
 }
@@ -412,7 +412,7 @@ export function initWebSocketServer(server: Server) {
                   });
                 }
               } catch (tokenErr) {
-                logger.warn('[WebSocket] Token verification threw — treating as auth failure', { error: tokenErr });
+                logger.warn('[WebSocket] Token verification threw — treating as auth failure', { error: getErrorMessage(tokenErr) });
               }
             }
 

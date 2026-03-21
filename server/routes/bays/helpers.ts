@@ -4,6 +4,7 @@ import { eq } from 'drizzle-orm';
 import { CALENDAR_CONFIG } from '../../core/calendar/index';
 import { bookingEvents } from '../../core/bookingEvents';
 import { logger } from '../../core/logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export async function getCalendarNameForBayAsync(bayId: number | null): Promise<string | null> {
   if (!bayId) return null;
@@ -16,7 +17,7 @@ export async function getCalendarNameForBayAsync(bayId: number | null): Promise<
       return CALENDAR_CONFIG.conference.name;
     }
   } catch (e: unknown) {
-    logger.error('[Bays] Failed to get calendar name for bay', { extra: { error: e } });
+    logger.error('[Bays] Failed to get calendar name for bay', { extra: { error: getErrorMessage(e) } });
   }
   
   return null;

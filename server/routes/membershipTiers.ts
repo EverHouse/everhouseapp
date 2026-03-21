@@ -251,11 +251,11 @@ router.put('/api/membership-tiers/:id', isAdmin, validateBody(updateTierSchema),
       synced = pushResult.success;
       if (!pushResult.success) {
         syncError = pushResult.error || 'Stripe sync failed';
-        logger.error('[AutoPush] Tier push failed', { error: syncError });
+        logger.error('[AutoPush] Tier push failed', { error: getErrorMessage(syncError) });
       }
     } catch (err) {
       syncError = getErrorMessage(err);
-      logger.error('[AutoPush] Tier push exception', { error: syncError });
+      logger.error('[AutoPush] Tier push exception', { error: getErrorMessage(syncError) });
     }
 
     if (name || is_active !== undefined) {
@@ -322,11 +322,11 @@ router.post('/api/membership-tiers', isAdmin, validateBody(createTierSchema), as
       synced = pushResult.success;
       if (!pushResult.success) {
         syncError = pushResult.error || 'Stripe sync failed';
-        logger.error('[AutoPush] Tier push failed', { error: syncError });
+        logger.error('[AutoPush] Tier push failed', { error: getErrorMessage(syncError) });
       }
     } catch (err) {
       syncError = getErrorMessage(err);
-      logger.error('[AutoPush] Tier push exception', { error: syncError });
+      logger.error('[AutoPush] Tier push exception', { error: getErrorMessage(syncError) });
     }
 
     import('../core/hubspot/stages').then(({ ensureHubSpotPropertiesExist }) =>

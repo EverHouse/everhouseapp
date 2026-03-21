@@ -101,7 +101,7 @@ export async function syncCompanyToHubSpot(
         }
 
         if (!isProduction) {
-          logger.warn('[CompanyHubSpot] Error searching for company, will create new one:', { error: error });
+          logger.warn('[CompanyHubSpot] Error searching for company, will create new one:', { error: getErrorMessage(error) });
         }
       }
     }
@@ -168,7 +168,7 @@ export async function syncCompanyToHubSpot(
         }
       } catch (error: unknown) {
         if (!isProduction) {
-          logger.warn('[CompanyHubSpot] Error searching for contact:', { error: error });
+          logger.warn('[CompanyHubSpot] Error searching for contact:', { error: getErrorMessage(error) });
         }
       }
     }
@@ -189,7 +189,7 @@ export async function syncCompanyToHubSpot(
           logger.info(`[CompanyHubSpot] Associated contact ${contactId} with company ${companyId}`);
         }
       } catch (assocError: unknown) {
-        logger.warn('[CompanyHubSpot] Failed to associate contact with company:', { error: assocError });
+        logger.warn('[CompanyHubSpot] Failed to associate contact with company:', { error: getErrorMessage(assocError) });
       }
     }
 
@@ -201,7 +201,7 @@ export async function syncCompanyToHubSpot(
 
   } catch (error: unknown) {
     const errorMsg = getErrorMessage(error);
-    logger.error('[CompanyHubSpot] Error syncing company:', { error: error });
+    logger.error('[CompanyHubSpot] Error syncing company:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: errorMsg || 'Failed to sync company to HubSpot'

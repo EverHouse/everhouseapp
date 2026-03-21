@@ -182,7 +182,7 @@ router.post('/api/auth/google/verify', requireGoogleConfig, authRateLimiterByIp,
 
     req.session.save((err) => {
       if (err) {
-        logger.error('[Google Auth] Session save error', { extra: { error: err } });
+        logger.error('[Google Auth] Session save error', { extra: { error: getErrorMessage(err) } });
         return res.status(500).json({ error: 'Failed to create session' });
       }
       res.json({ success: true, member });
@@ -331,7 +331,7 @@ router.post('/api/auth/google/callback', requireGoogleConfig, async (req, res) =
 
     req.session.save((err) => {
       if (err) {
-        logger.error('[Google Auth Callback] Session save error', { extra: { error: err } });
+        logger.error('[Google Auth Callback] Session save error', { extra: { error: getErrorMessage(err) } });
         return res.redirect('/login?error=session_failed');
       }
       const destination = (role === 'admin' || role === 'staff') ? '/admin' : '/dashboard';

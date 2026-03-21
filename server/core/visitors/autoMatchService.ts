@@ -7,6 +7,7 @@ import { recordUsage, ensureSessionForBooking } from '../bookingService/sessionM
 
 import { toTextArrayLiteral } from '../../utils/sqlArrayLiteral';
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 export interface BookingTypeInfo {
   keyword: string | null;
   visitorType: VisitorType;
@@ -267,7 +268,7 @@ export async function matchBookingToPurchase(
       source: row.source as 'legacy' | 'day_pass'
     };
   } catch (error: unknown) {
-    logger.error('[AutoMatch] Error matching booking to purchase:', { error: error });
+    logger.error('[AutoMatch] Error matching booking to purchase:', { error: getErrorMessage(error) });
     return null;
   }
 }
@@ -404,7 +405,7 @@ async function createBookingSessionForAutoMatch(
     
     return sessionId;
   } catch (error: unknown) {
-    logger.error('[AutoMatch] Error creating booking session:', { error: error });
+    logger.error('[AutoMatch] Error creating booking session:', { error: getErrorMessage(error) });
     return null;
   }
 }
@@ -538,7 +539,7 @@ export async function autoMatchSingleBooking(
     result.reason = 'No matching purchase found and no fallback applicable';
     return result;
   } catch (error: unknown) {
-    logger.error('[AutoMatch] Error auto-matching booking:', { error: error });
+    logger.error('[AutoMatch] Error auto-matching booking:', { error: getErrorMessage(error) });
     result.reason = error instanceof Error ? error.message : 'Unknown error';
     return result;
   }
@@ -970,7 +971,7 @@ async function autoMatchBookingRequests(
       matched++;
       logger.info(`[AutoMatch] Matched booking_request #${row.id} -> ${visitor.email} (existing real visitor)`);
     } catch (error: unknown) {
-      logger.error(`[AutoMatch] Error matching booking_request #${row.id}:`, { error: error });
+      logger.error(`[AutoMatch] Error matching booking_request #${row.id}:`, { error: getErrorMessage(error) });
       results.push({
         bookingId: row.id as number,
         matched: false,
@@ -1002,7 +1003,7 @@ export async function autoMatchAllUnmatchedBookings(
     
     return { matched: totalMatched, failed: totalFailed, results: allResults };
   } catch (error: unknown) {
-    logger.error('[AutoMatch] Error in batch auto-match:', { error: error });
+    logger.error('[AutoMatch] Error in batch auto-match:', { error: getErrorMessage(error) });
     throw error;
   }
 }

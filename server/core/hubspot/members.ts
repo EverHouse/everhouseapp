@@ -55,7 +55,7 @@ export async function findOrCreateHubSpotContact(
       dbStatus = row.membership_status;
     }
   } catch (dbErr: unknown) {
-    logger.warn(`[HubSpot] Failed to look up DB status for ${email}:`, { error: dbErr });
+    logger.warn(`[HubSpot] Failed to look up DB status for ${email}:`, { error: getErrorMessage(dbErr) });
   }
   
   try {
@@ -131,10 +131,10 @@ export async function findOrCreateHubSpotContact(
                 );
                 logger.warn(`[HubSpot] Restored lifecycle to '${currentLifecycle || 'lead'}' for contact ${contactId} after update failure`);
               } catch (restoreErr: unknown) {
-                logger.error(`[HubSpot] CRITICAL: Contact ${contactId} may have blank lifecycle after failed update + failed restore`, { error: restoreErr });
+                logger.error(`[HubSpot] CRITICAL: Contact ${contactId} may have blank lifecycle after failed update + failed restore`, { error: getErrorMessage(restoreErr) });
               }
             }
-            logger.warn(`[HubSpot] Failed to update existing contact ${contactId} for ${email.toLowerCase()}:`, { error: updateErr });
+            logger.warn(`[HubSpot] Failed to update existing contact ${contactId} for ${email.toLowerCase()}:`, { error: getErrorMessage(updateErr) });
           }
         }
       }
@@ -159,11 +159,11 @@ export async function findOrCreateHubSpotContact(
       );
     
     if (isNetworkOrAuthError) {
-      logger.error('[HubSpot] Network/Auth error during contact search:', { error: error });
+      logger.error('[HubSpot] Network/Auth error during contact search:', { error: getErrorMessage(error) });
       throw error;
     }
     
-    if (!isProduction) logger.warn('[HubSpot] Error searching for contact, will create new one:', { error: error });
+    if (!isProduction) logger.warn('[HubSpot] Error searching for contact, will create new one:', { error: getErrorMessage(error) });
   }
   
   if (isHubSpotReadOnly()) {
@@ -285,7 +285,7 @@ export async function createMemberLocally(input: AddMemberInput): Promise<Create
     
     return { success: true, userId: String((result.rows as Array<Record<string, unknown>>)[0].id) };
   } catch (error: unknown) {
-    logger.error('[AddMember] Failed to create user locally:', { error: error });
+    logger.error('[AddMember] Failed to create user locally:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) || 'Failed to create member' };
   }
 }
@@ -378,7 +378,7 @@ export async function syncTierToHubSpot(params: {
       );
       lifecycleCleared = true;
     } catch (clearError: unknown) {
-      logger.warn(`[HubSpot TierSync] Could not clear lifecyclestage for ${normalizedEmail} before setting to '${lifecyclestage}':`, { error: clearError });
+      logger.warn(`[HubSpot TierSync] Could not clear lifecyclestage for ${normalizedEmail} before setting to '${lifecyclestage}':`, { error: getErrorMessage(clearError) });
     }
 
     try {
@@ -393,7 +393,7 @@ export async function syncTierToHubSpot(params: {
           );
           logger.warn(`[HubSpot TierSync] Restored lifecycle to '${previousLifecycle || lifecyclestage}' for contact ${hubspotContactId} after update failure`);
         } catch (restoreErr: unknown) {
-          logger.error(`[HubSpot TierSync] CRITICAL: Contact ${hubspotContactId} (${normalizedEmail}) may have blank lifecycle after failed update + failed restore`, { error: restoreErr });
+          logger.error(`[HubSpot TierSync] CRITICAL: Contact ${hubspotContactId} (${normalizedEmail}) may have blank lifecycle after failed update + failed restore`, { error: getErrorMessage(restoreErr) });
         }
       }
 
@@ -429,7 +429,7 @@ export async function syncTierToHubSpot(params: {
     
     logger.info(`[HubSpot TierSync] Updated contact ${normalizedEmail}: tier="${hubspotTier}", status="${hubspotStatus}", lifecycle="${lifecyclestage}", billing="${hubspotBillingProvider || 'not set'}"`);
   } catch (error: unknown) {
-    logger.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, { error: error });
+    logger.error(`[HubSpot TierSync] Failed to sync tier for ${normalizedEmail}:`, { error: getErrorMessage(error) });
     throw error;
   }
 }

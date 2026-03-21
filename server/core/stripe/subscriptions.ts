@@ -158,7 +158,7 @@ export async function createSubscription(params: CreateSubscriptionParams): Prom
       },
     };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error creating subscription:', { error: error });
+    logger.error('[Stripe Subscriptions] Error creating subscription:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -179,7 +179,7 @@ export async function cancelSubscription(subscriptionId: string): Promise<{
     
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error canceling subscription:', { error: error });
+    logger.error('[Stripe Subscriptions] Error canceling subscription:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -344,7 +344,7 @@ export async function listCustomerSubscriptions(customerId: string): Promise<{
       };
     }
     
-    logger.error('[Stripe Subscriptions] Error listing subscriptions:', { error: error });
+    logger.error('[Stripe Subscriptions] Error listing subscriptions:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -396,7 +396,7 @@ export async function getSubscription(subscriptionId: string): Promise<{
       },
     };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error getting subscription:', { error: error });
+    logger.error('[Stripe Subscriptions] Error getting subscription:', { error: getErrorMessage(error) });
     return {
       success: false,
       error: getErrorMessage(error),
@@ -424,7 +424,7 @@ export async function pauseSubscription(
     logger.info(`[Stripe Subscriptions] Paused subscription ${subscriptionId} until ${resumeDate.toISOString()}`);
     return { success: true, resumeDate };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error pausing subscription:', { error: error });
+    logger.error('[Stripe Subscriptions] Error pausing subscription:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -440,7 +440,7 @@ export async function resumeSubscription(subscriptionId: string): Promise<{ succ
     logger.info(`[Stripe Subscriptions] Resumed subscription ${subscriptionId}`);
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error resuming subscription:', { error: error });
+    logger.error('[Stripe Subscriptions] Error resuming subscription:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }
@@ -516,7 +516,7 @@ export async function changeSubscriptionTier(
 
     return { success: true };
   } catch (error: unknown) {
-    logger.error('[Stripe Subscriptions] Error changing tier:', { error: error });
+    logger.error('[Stripe Subscriptions] Error changing tier:', { error: getErrorMessage(error) });
     return { success: false, error: getErrorMessage(error) };
   }
 }

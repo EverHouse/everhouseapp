@@ -114,7 +114,7 @@ async function expireStaleBookingRequests(): Promise<void> {
       try {
         await cancelPendingPaymentIntentsForBooking(booking.id, { skipSnapshotUpdate: true });
       } catch (err: unknown) {
-        logger.warn(`[Booking Expiry] Failed to cancel Stripe PIs for expired booking #${booking.id}`, { error: err });
+        logger.warn(`[Booking Expiry] Failed to cancel Stripe PIs for expired booking #${booking.id}`, { error: getErrorMessage(err) });
       }
       voidBookingPass(booking.id).catch(err =>
         logger.error('[Booking Expiry] Wallet pass void failed', { extra: { bookingId: booking.id, error: getErrorMessage(err) } })
@@ -289,7 +289,7 @@ export async function runManualBookingExpiry(): Promise<{ expiredCount: number }
       try {
         await cancelPendingPaymentIntentsForBooking(expiredId, { skipSnapshotUpdate: true });
       } catch (err: unknown) {
-        logger.warn(`[Booking Expiry] Manual: failed to cancel Stripe PIs for expired booking #${expiredId}`, { error: err });
+        logger.warn(`[Booking Expiry] Manual: failed to cancel Stripe PIs for expired booking #${expiredId}`, { error: getErrorMessage(err) });
       }
       voidBookingPass(expiredId).catch(err =>
         logger.error('[Booking Expiry] Manual: wallet pass void failed', { extra: { bookingId: expiredId, error: getErrorMessage(err) } })

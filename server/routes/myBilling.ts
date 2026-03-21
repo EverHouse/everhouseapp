@@ -1114,7 +1114,7 @@ router.get('/api/my-billing/payment-history', requireAuth, async (req, res) => {
           }
         }
       } catch (invoiceErr: unknown) {
-        logger.warn('[MyBilling] Failed to fetch invoices for payment history', { error: invoiceErr });
+        logger.warn('[MyBilling] Failed to fetch invoices for payment history', { error: getErrorMessage(invoiceErr) });
       }
     }
 

@@ -64,7 +64,7 @@ export async function cancelPendingPaymentIntentsForBooking(bookingId: number, o
       }
     }
   } catch (e: unknown) {
-    logger.warn('[Payment Intent Cleanup] Non-critical cleanup failed:', { error: e });
+    logger.warn('[Payment Intent Cleanup] Non-critical cleanup failed:', { error: getErrorMessage(e) });
   }
 }
 
@@ -155,7 +155,7 @@ export async function refundSucceededPaymentIntentsForBooking(bookingId: number)
       }
     }
   } catch (e: unknown) {
-    logger.warn('[PI Cleanup] Non-critical refund cleanup failed:', { error: e });
+    logger.warn('[PI Cleanup] Non-critical refund cleanup failed:', { error: getErrorMessage(e) });
   }
   return refundCount;
 }

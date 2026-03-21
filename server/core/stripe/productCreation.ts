@@ -102,7 +102,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
           logger.warn(`[Overage Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
           stripePriceId = null;
         } else {
-          logger.warn(`[Overage Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+          logger.warn(`[Overage Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: getErrorMessage(priceErr) });
         }
       }
     }
@@ -140,7 +140,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
         updateOverageRate(actualPrice.unit_amount);
       }
     } catch (priceReadErr: unknown) {
-      logger.warn('[Overage Product] Failed to read Stripe price, using default:', { error: priceReadErr });
+      logger.warn('[Overage Product] Failed to read Stripe price, using default:', { error: getErrorMessage(priceReadErr) });
     }
 
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
@@ -259,7 +259,7 @@ export async function ensureGuestPassProduct(): Promise<{
           logger.warn(`[Guest Pass Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
           stripePriceId = null;
         } else {
-          logger.warn(`[Guest Pass Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+          logger.warn(`[Guest Pass Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: getErrorMessage(priceErr) });
         }
       }
     }
@@ -297,7 +297,7 @@ export async function ensureGuestPassProduct(): Promise<{
         updateGuestFee(actualPrice.unit_amount);
       }
     } catch (priceReadErr: unknown) {
-      logger.warn('[Guest Pass Product] Failed to read Stripe price, using default:', { error: priceReadErr });
+      logger.warn('[Guest Pass Product] Failed to read Stripe price, using default:', { error: getErrorMessage(priceReadErr) });
     }
 
     return { success: true, stripeProductId, stripePriceId, action: existing.length > 0 && existing[0].stripePriceId ? 'exists' : 'created' };
@@ -384,7 +384,7 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
           logger.warn(`[Day Pass Coworking Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
           stripePriceId = null;
         } else {
-          logger.warn(`[Day Pass Coworking Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+          logger.warn(`[Day Pass Coworking Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: getErrorMessage(priceErr) });
         }
       }
     }
@@ -517,7 +517,7 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
           logger.warn(`[Day Pass Golf Sim Product] Stored Stripe price ${stripePriceId} no longer exists, will recreate`);
           stripePriceId = null;
         } else {
-          logger.warn(`[Day Pass Golf Sim Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: priceErr });
+          logger.warn(`[Day Pass Golf Sim Product] Transient error retrieving price ${stripePriceId}, keeping existing`, { error: getErrorMessage(priceErr) });
         }
       }
     }

@@ -842,7 +842,7 @@ export async function runAllIntegrityChecks(triggeredBy: 'manual' | 'scheduled' 
     await alertOnCriticalIntegrityIssues(checkSummaries as IntegrityCheckSummary[], severityMap);
     await alertOnHighIntegrityIssues(checkSummaries as IntegrityCheckSummary[], severityMap);
   } catch (err: unknown) {
-    if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: err });
+    if (!isProduction) logger.error('[DataIntegrity] Failed to store history:', { error: getErrorMessage(err) });
   }
 
   return checks;

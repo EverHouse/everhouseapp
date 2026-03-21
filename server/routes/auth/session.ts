@@ -92,7 +92,7 @@ sessionRouter.get('/api/auth/session', async (req, res) => {
 
   if (sessionDirty) {
     req.session.save((err) => {
-      if (err) logger.warn('[Auth] Failed to persist session update', { error: err });
+      if (err) logger.warn('[Auth] Failed to persist session update', { error: getErrorMessage(err) });
     });
   }
 

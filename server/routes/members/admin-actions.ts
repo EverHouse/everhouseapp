@@ -921,7 +921,7 @@ router.delete('/api/members/:email/permanent', isAdmin, async (req, res) => {
       await db.execute(sql`DELETE FROM account_deletion_requests WHERE user_id = ${userId}::text::integer`);
       deletionLog.push('account_deletion_requests');
     } catch (err) {
-      logger.debug('account_deletion_requests deletion skipped due to type mismatch', { error: err });
+      logger.debug('account_deletion_requests deletion skipped due to type mismatch', { error: getErrorMessage(err) });
       deletionLog.push('account_deletion_requests (skipped - type mismatch)');
     }
     

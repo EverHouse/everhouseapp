@@ -6,6 +6,7 @@ import { isStaffOrAdmin } from '../../core/middleware';
 import { importTrackmanBookings, getImportRuns, rescanUnmatchedBookings } from '../../core/trackmanImport';
 import { logFromRequest } from '../../core/auditLog';
 import { logger } from '../../core/logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 import { getSessionUser } from '../../types/session';
 
 const router = Router();
@@ -103,7 +104,7 @@ router.post('/api/admin/trackman/upload', isStaffOrAdmin, upload.single('file'),
       try {
         fs.unlinkSync(csvPath);
       } catch (cleanupErr) {
-        logger.error('Failed to cleanup uploaded file', { extra: { error: cleanupErr } });
+        logger.error('Failed to cleanup uploaded file', { extra: { error: getErrorMessage(cleanupErr) } });
       }
     }
   }

@@ -24,6 +24,9 @@ export const changelog: ChangelogEntry[] = [
       "Fixed: Stripe catalog webhook handlers now call invalidateTierRegistry() instead of clearTierCache() — ensures normalization maps reload after Stripe-driven tier mutations",
       "Fixed: Stripe reverse-sync (pullTierFeaturesFromStripe) now calls invalidateTierRegistry() after updating tiers from Stripe",
       "Fixed: Landing page no longer filters tiers by hardcoded slugs — shows first 3 active tiers dynamically",
+      "Fixed: Comprehensive getErrorMessage() sweep — all catch blocks across 45+ server files now use getErrorMessage() instead of logging raw error objects (Stripe, HubSpot, calendar, billing, visitors, trackman, integrity, routes)",
+      "Fixed: Removed unused clearTierCache imports from catalog.ts and productCatalogSync.ts",
+      "Fixed: Stripe webhook catalog handlers now defer invalidateTierRegistry() to post-COMMIT via deferred actions — prevents reading stale tier data during open transaction",
     ]
   },
   {

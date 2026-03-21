@@ -514,7 +514,7 @@ export async function linkEmailToMember(ownerEmail: string, originalEmail: strin
       }
     }
   } catch (linkErr: unknown) {
-    logger.warn('[resourceService] Failed to link email', { extra: { error: linkErr } });
+    logger.warn('[resourceService] Failed to link email', { extra: { error: getErrorMessage(linkErr) } });
   }
   return false;
 }
