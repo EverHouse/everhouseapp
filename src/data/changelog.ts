@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.95.4",
+    date: "2026-03-21",
+    title: "Architect Audit Fixes: Missing Import, Guest Pass Fail-Closed",
+    changes: [
+      "Fixed: Missing getErrorMessage import in Stripe product helpers — would have caused a crash when Stripe product search failed",
+      "Fixed: Guest pass entitlement now defaults to 0 passes (fail-closed) instead of 4 when tier lookup fails — prevents members with broken tier linkage from receiving unearned guest passes",
+    ]
+  },
+  {
     version: "8.95.3",
     date: "2026-03-21",
     title: "Error Visibility: Silent Catch Blocks & Dangerous Fallback Defaults",

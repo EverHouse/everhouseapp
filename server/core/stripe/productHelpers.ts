@@ -1,6 +1,7 @@
 import { membershipTiers } from '../../../shared/schema';
 import Stripe from 'stripe';
 import { logger } from '../logger';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export type TierRecord = typeof membershipTiers.$inferSelect;
 

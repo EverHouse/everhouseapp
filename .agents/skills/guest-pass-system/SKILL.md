@@ -58,6 +58,7 @@ Booking cancelled
 8. **Broadcast after pass use/refund.** `broadcastMemberStatsUpdated(email, { guestPasses: remaining })`.
 9. **Auto-update allocation on tier change.** GET endpoint compares `passes_total` against tier config. On downgrade, clamp `passes_used` to new total.
 10. **Yearly reset is idempotent.** Uses `system_settings` key `'last_guest_pass_reset'` with year key `YYYY`. Runs only on January 1st, 3am–8am Pacific catch-up window.
+11. **Tier lookup fail-closed (v8.95.4).** When `guest_passes_per_year` lookup returns null (e.g., member has no `tier_id` linkage), both `consumeGuestPass()` and `canUseGuestPass()` default to **0 passes** (not 4). A `logger.warn` fires to flag members with broken tier linkage.
 
 ## Anti-Patterns (NEVER)
 

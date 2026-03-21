@@ -61,21 +61,25 @@ export async function consumeGuestPassForParticipant(
        FROM users u 
        JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = ${ownerEmailLower}`);
-      const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year ?? 4;
+      const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year;
+      if (tierGuestPasses == null) {
+        logger.warn('[GuestPassConsumer] Tier guest_passes_per_year lookup returned null — member may have no tier_id linked. Defaulting to 0 passes (fail-closed).', { extra: { ownerEmail: ownerEmailLower } });
+      }
+      const effectiveGuestPasses = tierGuestPasses ?? 0;
       
       const existingPass = await tx.execute(sql`SELECT id, passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower} ORDER BY id ASC FOR UPDATE`);
       
       if (existingPass.rows.length === 0) {
         const insertResult = await tx.execute(sql`INSERT INTO guest_passes (member_email, passes_used, passes_total)
-         VALUES (${ownerEmailLower}, ${1}, ${tierGuestPasses})
+         VALUES (${ownerEmailLower}, ${1}, ${effectiveGuestPasses})
          RETURNING passes_total - passes_used as remaining`);
-        passesRemaining = (insertResult.rows[0] as unknown as GuestPassRemainingRow)?.remaining as number ?? ((tierGuestPasses as number) - 1);
+        passesRemaining = (insertResult.rows[0] as unknown as GuestPassRemainingRow)?.remaining as number ?? ((effectiveGuestPasses as number) - 1);
       } else {
         // eslint-disable-next-line prefer-const
         let { passes_used, passes_total } = existingPass.rows[0] as unknown as GuestPassRow;
-        if ((tierGuestPasses as number) > (passes_total as number)) {
-          await tx.execute(sql`UPDATE guest_passes SET passes_total = ${tierGuestPasses} WHERE LOWER(member_email) = ${ownerEmailLower}`);
-          passes_total = tierGuestPasses;
+        if ((effectiveGuestPasses as number) > (passes_total as number)) {
+          await tx.execute(sql`UPDATE guest_passes SET passes_total = ${effectiveGuestPasses} WHERE LOWER(member_email) = ${ownerEmailLower}`);
+          passes_total = effectiveGuestPasses;
         }
         if ((passes_used as number) >= (passes_total as number)) {
           throw new Error(`NO_PASSES_REMAINING:No guest passes remaining. ${ownerEmailLower} has 0/${passes_total} passes available.`);
@@ -190,12 +194,16 @@ export async function canUseGuestPass(ownerEmail: string): Promise<{
        FROM users u 
        JOIN membership_tiers mt ON u.tier_id = mt.id
        WHERE LOWER(u.email) = ${ownerEmailLower}`);
-    const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year ?? 4;
+    const tierGuestPasses = (tierResult.rows[0] as unknown as TierGuestPassRow)?.guest_passes_per_year;
+    if (tierGuestPasses == null) {
+      logger.warn('[GuestPassConsumer] canUseGuestPass: tier guest_passes_per_year lookup returned null — defaulting to 0 (fail-closed).', { extra: { ownerEmail: ownerEmailLower } });
+    }
+    const effectiveGuestPasses = tierGuestPasses ?? 0;
     
     const result = await db.execute(sql`SELECT passes_used, passes_total FROM guest_passes WHERE LOWER(member_email) = ${ownerEmailLower}`);
     
     if (result.rows.length === 0) {
-      return { canUse: (tierGuestPasses as number) > 0, remaining: tierGuestPasses as number, total: tierGuestPasses as number };
+      return { canUse: (effectiveGuestPasses as number) > 0, remaining: effectiveGuestPasses as number, total: effectiveGuestPasses as number };
     }
     
     const row = result.rows[0] as unknown as GuestPassRow;

@@ -2,6 +2,14 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.95.4] - 2026-03-21
+
+### Architect Audit Fixes: Missing Import, Guest Pass Fail-Closed
+- **Fixed**: Missing `getErrorMessage` import in `server/core/stripe/productHelpers.ts` — the `findExistingStripeProduct` catch block called `getErrorMessage()` without importing it, which would throw a `ReferenceError` if Stripe product search failed, breaking the fallback product resolution path.
+- **Fixed**: Guest pass entitlement in `server/core/billing/guestPassConsumer.ts` now defaults to `0` passes (fail-closed) instead of `4` when tier lookup returns null. Previously, a member with no `tier_id` linkage would silently receive 4 guest passes per year. Both `consumeGuestPass()` and `canUseGuestPass()` paths affected. Added `logger.warn` when the fallback activates so operators can identify members with broken tier linkage.
+- **Known**: `all_features` Stripe encoding is lossy — `Record<string, boolean>` flattening in `buildMergedMarketingFeatures` can overwrite richer `{label,value,included}` objects, and the 15-entry marketing_features cap prevents full round-trip. Noted for future improvement.
+- **Known**: `autoPushTierToStripe` does not include `all_features` sync — only `highlighted_features` are pushed during admin tier create/update. Full sync requires separate catalog sync.
+
 ## [8.95.3] - 2026-03-21
 
 ### Error Visibility: Silent Catch Blocks & Dangerous Fallback Defaults
