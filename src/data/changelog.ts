@@ -10,10 +10,9 @@ export const changelog: ChangelogEntry[] = [
   {
     version: "8.97.5",
     date: "2026-03-22",
-    title: "Bug Fix: Stuck Bookings Auto-Complete",
+    title: "Improvement: Booking Auto-Complete Window",
     changes: [
-      "Fixed: Past bookings with unpaid fees no longer get permanently stuck — after 5 days, pending fees are auto-waived and the booking is completed, with staff notified",
-      "Improved: Booking auto-complete window extended from 3 days to 14 days to catch more edge cases",
+      "Improved: Booking auto-complete lookback window extended from 3 days to 14 days, so older past bookings are still completed instead of being missed",
     ]
   },
   {

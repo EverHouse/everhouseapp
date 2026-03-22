@@ -4,8 +4,8 @@ All notable changes to the Ever Club Members App are documented here.
 
 ## [8.97.5] - 2026-03-22
 
-### Bug Fix: Stuck Bookings Auto-Complete
-- **Fixed**: Bookings with unpaid participant fees (e.g., guest fees) that went uncollected would get permanently stuck in "approved" status. The auto-complete scheduler only looked back 3 days, so after that window the booking would never be completed. Added `autoWaiveOldStuckFees()` that runs before each auto-complete cycle — after 5+ days, pending participant fees are auto-waived (`payment_status = 'waived'`) and fee snapshots are cancelled, allowing the booking to proceed to "attended" status. Staff are notified via a "Fees Auto-Waived — Old Bookings" notification. Extended the auto-complete window from 3 days to 14 days for both the scheduled and manual runs.
+### Improvement: Booking Auto-Complete Window
+- **Improved**: Extended booking auto-complete lookback window from 3 days to 14 days in both the scheduled and manual runs. Previously, bookings older than 3 days were never auto-completed even if their time had clearly passed.
 - **Files changed**: `server/schedulers/bookingAutoCompleteScheduler.ts`
 
 ## [8.97.4] - 2026-03-22
