@@ -2,6 +2,12 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.97.8] - 2026-03-22
+
+### Fix: Production Data Sync
+- **Fixed**: `resync-from-production` endpoint crashed with `getErrorMessage is not defined` because the utility was not imported in `server/routes/dataIntegrity/sync.ts`. The sync successfully exported 71 tables from production and truncated the local DB, but then failed during the import step — leaving the dev database completely empty (0 users, 0 staff).
+- **File**: `server/routes/dataIntegrity/sync.ts:8` (added `getErrorMessage` to import)
+
 ## [8.97.7] - 2026-03-22
 
 ### Fix: Cafe Item Delete

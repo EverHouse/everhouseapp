@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.97.8",
+    date: "2026-03-22",
+    title: "Production Data Sync Fix",
+    changes: [
+      "Fixed: 'Load from Production' sync crashed with missing getErrorMessage import — data export succeeded but import failed, leaving dev database empty",
+    ]
+  },
+  {
     version: "8.97.7",
     date: "2026-03-22",
     title: "Cafe Item Delete Fix",

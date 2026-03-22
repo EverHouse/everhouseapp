@@ -5,7 +5,7 @@ import { mkdirSync, existsSync, readdirSync, unlinkSync } from 'fs';
 import { syncPush, syncPull, runDataCleanup } from '../../core/dataIntegrity';
 import { syncAllCustomerMetadata } from '../../core/stripe/customers';
 import { getSystemHealth } from '../../core/healthCheck';
-import { logger, isAdmin, validateBody, broadcastDataIntegrityUpdate, logFromRequest, sendFixError } from './shared';
+import { logger, isAdmin, validateBody, broadcastDataIntegrityUpdate, logFromRequest, sendFixError, getErrorMessage } from './shared';
 import type { Request } from 'express';
 import { syncPushPullSchema } from '../../../shared/validators/dataIntegrity';
 
