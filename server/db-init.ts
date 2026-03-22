@@ -471,6 +471,13 @@ export async function ensureDatabaseConstraints() {
     }
 
     try {
+      await db.execute(sql`ALTER TABLE users ALTER COLUMN tier DROP DEFAULT`);
+      logger.info('[DB Init] Removed hardcoded tier column default (tiers are now dynamic)');
+    } catch (err: unknown) {
+      logger.debug(`[DB Init] Tier default removal skipped: ${getErrorMessage(err)}`);
+    }
+
+    try {
       await db.execute(sql`
         UPDATE users SET billing_provider = 'manual', updated_at = NOW()
         WHERE billing_provider NOT IN ('stripe', 'mindbody', 'manual', 'comped', 'family_addon')
