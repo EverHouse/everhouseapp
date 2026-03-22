@@ -7,7 +7,19 @@ function hasProperty<K extends string>(value: unknown, key: K): value is Record<
 }
 
 export function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) return error.message;
+  if (error instanceof Error) {
+    const cause = error.cause;
+    if (cause instanceof Error) {
+      return `${error.message} [cause: ${cause.message}]`;
+    }
+    if (typeof cause === 'string') {
+      return `${error.message} [cause: ${cause}]`;
+    }
+    if (isNonNullObject(cause) && 'message' in cause && typeof cause.message === 'string') {
+      return `${error.message} [cause: ${cause.message}]`;
+    }
+    return error.message;
+  }
   if (typeof error === 'string') return error;
   return String(error);
 }

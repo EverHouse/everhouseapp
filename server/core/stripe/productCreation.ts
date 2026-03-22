@@ -119,7 +119,7 @@ export async function ensureSimulatorOverageProduct(): Promise<{
           app_category: 'fee',
         },
       }, {
-        idempotencyKey: `price_overage_${OVERAGE_SLUG}_${OVERAGE_PRICE_CENTS}`
+        idempotencyKey: `price_overage_${stripeProductId}_${OVERAGE_PRICE_CENTS}`
       });
       stripePriceId = price.id;
       logger.info(`[Overage Product] Created Stripe price: ${stripePriceId}`);
@@ -276,7 +276,7 @@ export async function ensureGuestPassProduct(): Promise<{
           app_category: 'fee',
         },
       }, {
-        idempotencyKey: `price_guest_pass_${GUEST_PASS_SLUG}_${GUEST_PASS_PRICE_CENTS}`
+        idempotencyKey: `price_guest_pass_${stripeProductId}_${GUEST_PASS_PRICE_CENTS}`
       });
       stripePriceId = price.id;
       logger.info(`[Guest Pass Product] Created Stripe price: ${stripePriceId}`);
@@ -419,7 +419,7 @@ export async function ensureDayPassCoworkingProduct(): Promise<{
           app_category: 'fee',
         },
       }, {
-        idempotencyKey: `price_daypass_${COWORKING_SLUG}_${COWORKING_PRICE_CENTS}`
+        idempotencyKey: `price_daypass_${stripeProductId}_${COWORKING_PRICE_CENTS}`
       });
       stripePriceId = price.id;
       logger.info(`[Day Pass Coworking Product] Created Stripe price: ${stripePriceId}`);
@@ -552,7 +552,7 @@ export async function ensureDayPassGolfSimProduct(): Promise<{
           app_category: 'fee',
         },
       }, {
-        idempotencyKey: `price_daypass_${GOLF_SIM_SLUG}_${GOLF_SIM_PRICE_CENTS}`
+        idempotencyKey: `price_daypass_${stripeProductId}_${GOLF_SIM_PRICE_CENTS}`
       });
       stripePriceId = price.id;
       logger.info(`[Day Pass Golf Sim Product] Created Stripe price: ${stripePriceId}`);

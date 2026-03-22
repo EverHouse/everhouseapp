@@ -1,6 +1,6 @@
 # Ever Club Members App
 
-**Current Version**: 8.97.1 (March 21, 2026)
+**Current Version**: 8.97.2 (March 22, 2026)
 
 ## Overview
 The Ever Club Members App is a private members club application designed for golf and wellness centers. Its primary purpose is to serve as a central digital hub for managing golf simulator bookings, wellness service appointments, and club events. The project aims to enhance member satisfaction and operational efficiency through comprehensive membership management, facility booking, and community-building tools, ultimately creating a seamless digital experience for club members and staff.

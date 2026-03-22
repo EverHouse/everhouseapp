@@ -8,6 +8,15 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.97.2",
+    date: "2026-03-22",
+    title: "Bug Fixes: Stripe Product Startup & Error Diagnostics",
+    changes: [
+      "Fixed: Simulator Overage product no longer fails on server startup — was caused by a Stripe key conflict when the product was recreated",
+      "Improved: Error messages now show the underlying database error instead of a generic wrapper, making production issues much easier to diagnose",
+    ]
+  },
+  {
     version: "8.97.1",
     date: "2026-03-21",
     title: "Fix: Checked-In Bookings & Trackman Slots Now Block Availability",

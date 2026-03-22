@@ -2,6 +2,12 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.97.2] - 2026-03-22
+
+### Bug Fixes: Stripe Product Startup & Error Diagnostics
+- **Fixed**: Stripe Overage Product idempotency key conflict — price creation used slug-based keys that conflicted when the Stripe product was recreated with a new ID. Now uses `stripeProductId` in idempotency keys for all 4 product price creation paths (overage, guest pass, day pass coworking, day pass golf sim) in `server/core/stripe/productCreation.ts`
+- **Fixed**: `getErrorMessage()` in `server/utils/errorUtils.ts` now extracts `.cause` from Drizzle ORM errors — previously all DB errors in catch blocks showed "Failed query: ..." instead of the actual PostgreSQL error, making production debugging impossible
+
 ## [8.97.1] - 2026-03-21
 
 ### Fix: Checked-In Bookings & Trackman Slots Now Block Availability
