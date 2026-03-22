@@ -19,6 +19,71 @@ interface AutoCompletedBookingResult {
   trackmanBookingId: string | null;
 }
 
+async function autoWaiveOldStuckFees(todayStr: string): Promise<number> {
+  const STUCK_DAYS_THRESHOLD = 5;
+
+  const oldStuck = await queryWithRetry<{ bookingId: number; sessionId: number; userName: string | null; userEmail: string; requestDate: string }>(
+    `SELECT br.id AS "bookingId", br.session_id AS "sessionId", br.user_name AS "userName",
+            br.user_email AS "userEmail", br.request_date AS "requestDate"
+     FROM booking_requests br
+     WHERE br.status IN ('approved', 'confirmed')
+       AND br.request_date < $1::date - INTERVAL '${STUCK_DAYS_THRESHOLD} days'
+       AND br.session_id IS NOT NULL
+       AND EXISTS (
+         SELECT 1 FROM booking_participants bp
+         WHERE bp.session_id = br.session_id
+           AND bp.cached_fee_cents > 0
+           AND bp.payment_status = 'pending'
+       )`,
+    [todayStr]
+  );
+
+  if (oldStuck.rows.length === 0) return 0;
+
+  let waived = 0;
+  for (const booking of oldStuck.rows) {
+    try {
+      await queryWithRetry(
+        `UPDATE booking_participants
+         SET payment_status = 'waived'
+         WHERE session_id = $1
+           AND cached_fee_cents > 0
+           AND payment_status = 'pending'`,
+        [booking.sessionId]
+      );
+
+      await queryWithRetry(
+        `UPDATE booking_fee_snapshots
+         SET status = 'cancelled',
+             updated_at = NOW()
+         WHERE booking_id = $1
+           AND status IN ('pending', 'requires_action')`,
+        [booking.bookingId]
+      );
+
+      waived++;
+      logger.info(`[Booking Auto-Complete] Auto-waived unpaid fees for booking #${booking.bookingId} (${booking.userName || booking.userEmail}, ${booking.requestDate}) — ${STUCK_DAYS_THRESHOLD}+ days past`);
+    } catch (err) {
+      logger.error(`[Booking Auto-Complete] Failed to auto-waive fees for booking #${booking.bookingId}:`, { error: err as Error });
+    }
+  }
+
+  if (waived > 0) {
+    const summary = oldStuck.rows.slice(0, 5)
+      .map(b => `• #${b.bookingId} ${b.userName || b.userEmail} - ${b.requestDate}`)
+      .join('\n');
+
+    await notifyAllStaff(
+      'Fees Auto-Waived — Old Bookings',
+      `${waived} booking(s) had unpaid fees auto-waived after ${STUCK_DAYS_THRESHOLD}+ days. These bookings will now be auto checked-in:\n\n${summary}`,
+      'system',
+      { sendPush: false }
+    );
+  }
+
+  return waived;
+}
+
 async function autoCompletePastBookings(): Promise<void> {
   try {
     const now = new Date();
@@ -27,13 +92,18 @@ async function autoCompletePastBookings(): Promise<void> {
 
     logger.info(`[Booking Auto-Complete] Running auto-complete check at ${todayStr} ${currentTimePacific}`);
 
+    const autoWaived = await autoWaiveOldStuckFees(todayStr);
+    if (autoWaived > 0) {
+      logger.info(`[Booking Auto-Complete] Auto-waived fees on ${autoWaived} old stuck booking(s)`);
+    }
+
     const stuckPendingPayments = await queryWithRetry<{ id: number; userEmail: string; userName: string | null; requestDate: string; startTime: string }>(
       `SELECT br.id, br.user_email AS "userEmail", br.user_name AS "userName", 
               br.request_date AS "requestDate", br.start_time AS "startTime"
        FROM booking_requests br
        WHERE br.status IN ('approved', 'confirmed')
          AND br.request_date < $1::date
-         AND br.request_date >= $1::date - INTERVAL '3 days'
+         AND br.request_date >= $1::date - INTERVAL '14 days'
          AND br.session_id IS NOT NULL
          AND EXISTS (
            SELECT 1 FROM booking_participants bp
@@ -82,7 +152,7 @@ async function autoCompletePastBookings(): Promise<void> {
            reviewed_by = 'system-auto-checkin'
        WHERE status IN ('approved', 'confirmed')
          AND status NOT IN ('attended', 'checked_in')
-         AND request_date >= $1::date - INTERVAL '3 days'
+         AND request_date >= $1::date - INTERVAL '14 days'
          AND (
            request_date < $1::date - INTERVAL '1 day'
            OR (
@@ -259,6 +329,11 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
   const todayStr = getTodayPacific();
   const currentTimePacific = formatTimePacific(new Date());
 
+  const waivedCount = await autoWaiveOldStuckFees(todayStr);
+  if (waivedCount > 0) {
+    logger.info(`[Booking Auto-Complete] Manual: auto-waived fees for ${waivedCount} old stuck booking(s)`);
+  }
+
   const result = await queryWithRetry<AutoCompletedBookingResult>(
     `UPDATE booking_requests 
      SET status = 'attended',
@@ -269,7 +344,7 @@ export async function runManualBookingAutoComplete(): Promise<{ markedCount: num
          reviewed_by = 'system-auto-checkin'
      WHERE status IN ('approved', 'confirmed')
        AND status NOT IN ('attended', 'checked_in')
-       AND request_date >= $1::date - INTERVAL '3 days'
+       AND request_date >= $1::date - INTERVAL '14 days'
        AND (
          request_date < $1::date - INTERVAL '1 day'
          OR (
