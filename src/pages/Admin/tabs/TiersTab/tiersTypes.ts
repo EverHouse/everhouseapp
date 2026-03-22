@@ -23,7 +23,7 @@ export interface MembershipTier {
     show_in_comparison: boolean;
     show_on_membership_page: boolean;
     highlighted_features: string[];
-    all_features: Record<string, boolean>;
+    all_features: Record<string, boolean | { label?: string; value?: string | boolean; included?: boolean }>;
     daily_sim_minutes: number;
     guest_passes_per_year: number;
     booking_window_days: number;
