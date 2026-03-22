@@ -4,9 +4,11 @@ All notable changes to the Ever Club Members App are documented here.
 
 ## [8.97.2] - 2026-03-22
 
-### Bug Fixes: Stripe Product Startup & Error Diagnostics
+### Bug Fixes: Stripe Product Startup, Error Diagnostics & Code Quality
 - **Fixed**: Stripe Overage Product idempotency key conflict — price creation used slug-based keys that conflicted when the Stripe product was recreated with a new ID. Now uses `stripeProductId` in idempotency keys for all 4 product price creation paths (overage, guest pass, day pass coworking, day pass golf sim) in `server/core/stripe/productCreation.ts`
-- **Fixed**: `getErrorMessage()` in `server/utils/errorUtils.ts` now extracts `.cause` from Drizzle ORM errors — previously all DB errors in catch blocks showed "Failed query: ..." instead of the actual PostgreSQL error, making production debugging impossible
+- **Fixed**: `getErrorMessage()` in `server/utils/errorUtils.ts` now extracts `.cause` from Drizzle ORM errors (Error, string, and object-with-message variants) — previously all DB errors in catch blocks showed "Failed query: ..." instead of the actual PostgreSQL error, making production debugging impossible
+- **Fixed**: Dev database sync catch block in `server/routes/dataIntegrity/sync.ts` referenced wrong variable (`err` from outer scope instead of the caught error) — error messages were from unrelated context
+- **Standardized**: Replaced ~24 instances of manual `error instanceof Error ? error.message : String(error)` with `getErrorMessage()` across 8 server files: `walletPass/passGenerator.ts`, `core/databaseCleanup.ts`, `core/sessionCleanup.ts`, `core/errorAlerts.ts`, `core/trackman/trackmanImport.ts`, `routes/dataIntegrity/sync.ts`, `routes/stripe/member-payments/saved-cards.ts`
 
 ## [8.97.1] - 2026-03-21
 

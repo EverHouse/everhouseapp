@@ -1,7 +1,7 @@
 import { db } from '../db';
 import { sql } from 'drizzle-orm';
 import { logger } from './logger';
-import { getErrorCode } from '../utils/errorUtils';
+import { getErrorCode, getErrorMessage } from '../utils/errorUtils';
 
 interface SessionStatsRow {
   total: string;
@@ -37,7 +37,7 @@ export async function cleanupExpiredSessions(): Promise<number> {
       return 0;
     }
     logger.error('[SessionCleanup] Failed to cleanup sessions', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'session.cleanup_failed' }
     });
     return 0;
@@ -76,7 +76,7 @@ export async function getSessionStats(): Promise<{
       return { total: 0, active: 0, expired: 0, oldestActive: null, newestActive: null };
     }
     logger.error('[SessionCleanup] Failed to get session stats', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'session.stats_failed' }
     });
     return { total: 0, active: 0, expired: 0, oldestActive: null, newestActive: null };
@@ -104,7 +104,7 @@ export async function runSessionCleanup(): Promise<void> {
     });
   } catch (error: unknown) {
     logger.error('[SessionCleanup] Scheduled cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'session.cleanup_failed' }
     });
   }

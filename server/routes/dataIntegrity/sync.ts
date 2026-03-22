@@ -196,9 +196,9 @@ router.post('/api/data-integrity/resync-from-production', isAdmin, async (req, r
             input: importSql
           } as Parameters<typeof execFileAsync>[2] & { input: string });
           imported++;
-        } catch {
+        } catch (importErr: unknown) {
           failed.push(table);
-          logger.warn(`[DevSync] Failed to import ${table}: ${err instanceof Error ? err.message : String(err)}`);
+          logger.warn(`[DevSync] Failed to import ${table}: ${getErrorMessage(importErr)}`);
         }
       }
     }

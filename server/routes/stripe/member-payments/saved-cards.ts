@@ -298,7 +298,7 @@ router.post('/api/member/bookings/:id/pay-saved-card', isAuthenticated, paymentR
       status: invoiceResult.status,
     });
   } catch (error: unknown) {
-    const errMsg = error instanceof Error ? error.message : String(error);
+    const errMsg = getErrorMessage(error);
     const stripeCode = (error as { code?: string })?.code;
     const stripeType = (error as { type?: string })?.type;
     const stripeDeclineCode = (error as { decline_code?: string })?.decline_code;

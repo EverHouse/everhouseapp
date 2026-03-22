@@ -2,6 +2,7 @@ import { db } from '../db';
 import { bookingRequests, notifications, users, eventRsvps } from '../../shared/schema';
 import { sql, eq, like, or, and, inArray } from 'drizzle-orm';
 import { logger } from './logger';
+import { getErrorMessage } from '../utils/errorUtils';
 
 interface DrizzleExecuteResult {
   rowCount?: number;
@@ -109,7 +110,7 @@ export async function cleanupTestData(): Promise<CleanupResult> {
     return result;
   } catch (error: unknown) {
     logger.error('[Cleanup] Test data cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.test_data_failed' }
     });
     throw error;
@@ -144,7 +145,7 @@ export async function cleanupOldBookings(daysOld: number = 90): Promise<number> 
     return oldBookings.length;
   } catch (error: unknown) {
     logger.error('[Cleanup] Old bookings cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.old_bookings_failed' }
     });
     throw error;
@@ -177,7 +178,7 @@ export async function cleanupOldNotifications(daysOld: number = 90): Promise<num
     return oldNotifications.length;
   } catch (error: unknown) {
     logger.error('[Cleanup] Old notifications cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.old_notifications_failed' }
     });
     throw error;
@@ -210,7 +211,7 @@ export async function cleanupOldUnreadNotifications(daysOld: number = 60): Promi
     return oldNotifications.length;
   } catch (error: unknown) {
     logger.error('[Cleanup] Old unread notifications cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.old_unread_notifications_failed' }
     });
     throw error;
@@ -236,7 +237,7 @@ export async function cleanupOldAvailabilityBlocks(daysOld: number = 30): Promis
     return count;
   } catch (error: unknown) {
     logger.error('[Cleanup] Old availability blocks cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.old_availability_blocks_failed' }
     });
     throw error;
@@ -271,7 +272,7 @@ export async function cleanupLessonClosures(): Promise<number> {
     return count;
   } catch (error: unknown) {
     logger.error('[Cleanup] Lesson closures cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.lesson_closures_failed' }
     });
     throw error;
@@ -285,7 +286,7 @@ export async function cleanupOldJobs(daysToKeep: number = 7): Promise<number> {
     return count;
   } catch (error: unknown) {
     logger.error('[Cleanup] Old jobs cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.old_jobs_failed' }
     });
     return 0;
@@ -311,7 +312,7 @@ export async function runScheduledCleanup(): Promise<void> {
     });
   } catch (error: unknown) {
     logger.error('[Cleanup] Scheduled cleanup failed', {
-      error: error instanceof Error ? error.message : String(error),
+      error: getErrorMessage(error),
       extra: { event: 'cleanup.scheduled_failed' }
     });
   }

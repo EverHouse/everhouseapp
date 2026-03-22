@@ -3,6 +3,7 @@ import forge from 'node-forge';
 import archiver from 'archiver';
 import sharp from 'sharp';
 import path from 'path';
+import { getErrorMessage } from '../utils/errorUtils';
 import fs from 'fs';
 
 interface PassData {
@@ -350,21 +351,21 @@ function signManifest(manifestJson: string, config: WalletConfig): Buffer {
     cert = forge.pki.certificateFromPem(config.certPem);
   } catch (e) {
     // eslint-disable-next-line preserve-caught-error
-    throw new Error(`Failed to parse pass certificate PEM: ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`Failed to parse pass certificate PEM: ${getErrorMessage(e)}`);
   }
 
   try {
     key = forge.pki.privateKeyFromPem(config.keyPem);
   } catch (e) {
     // eslint-disable-next-line preserve-caught-error
-    throw new Error(`Failed to parse pass private key PEM: ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`Failed to parse pass private key PEM: ${getErrorMessage(e)}`);
   }
 
   try {
     wwdr = forge.pki.certificateFromPem(WWDR_PEM);
   } catch (e) {
     // eslint-disable-next-line preserve-caught-error
-    throw new Error(`Failed to parse WWDR intermediate certificate: ${e instanceof Error ? e.message : String(e)}`);
+    throw new Error(`Failed to parse WWDR intermediate certificate: ${getErrorMessage(e)}`);
   }
 
   const p7 = forge.pkcs7.createSignedData();
