@@ -349,10 +349,13 @@ export function InlinePaymentBody({
           sessionId={rosterData?.sessionId}
           participantFees={rosterData?.financialSummary?.playerBreakdown?.filter((p: { fee: number }) => p.fee > 0).map((p: { fee: number }, i: number) => ({ id: i, amount: p.fee })) || []}
           onSuccess={async (paymentIntentId?: string) => {
+            let confirmed = true;
             if (paymentIntentId) {
+              confirmed = false;
               for (let attempt = 0; attempt < 2; attempt++) {
                 try {
                   await postWithCredentials('/api/stripe/confirm-payment', { paymentIntentId });
+                  confirmed = true;
                   break;
                 } catch (err: unknown) {
                   console.error(`Confirm-payment attempt ${attempt + 1} failed:`, err);
@@ -360,7 +363,13 @@ export function InlinePaymentBody({
                 if (attempt === 0) await new Promise(r => setTimeout(r, 1000));
               }
             }
-            handleInlineStripeSuccess();
+            if (confirmed) {
+              handleInlineStripeSuccess();
+            } else {
+              showToast('Payment was collected but failed to record in our system. Please check the booking and retry if needed.', 'warning');
+              setInlinePaymentAction(null);
+              onRefresh?.();
+            }
           }}
           onCancel={() => setInlinePaymentAction(null)}
         />

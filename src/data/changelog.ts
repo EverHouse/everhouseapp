@@ -8,6 +8,14 @@ export interface ChangelogEntry {
 
 export const changelog: ChangelogEntry[] = [
   {
+    version: "8.97.3",
+    date: "2026-03-22",
+    title: "Fix: Payment Confirmation Now Correctly Reports Failures",
+    changes: [
+      "Fixed: Staff payment flow now properly alerts when a payment is collected but the backend confirmation fails, instead of silently showing success",
+    ]
+  },
+  {
     version: "8.97.2",
     date: "2026-03-22",
     title: "Bug Fixes: Stripe Startup, Error Diagnostics & Code Quality",

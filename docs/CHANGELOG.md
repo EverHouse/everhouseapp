@@ -2,6 +2,11 @@
 
 All notable changes to the Ever Club Members App are documented here.
 
+## [8.97.3] - 2026-03-22
+
+### Fix: Payment Confirmation Now Correctly Reports Failures
+- **Fixed**: Staff inline Stripe payment flow in `PaymentSection.tsx` — `onSuccess` callback called `handleInlineStripeSuccess()` unconditionally even when both retry attempts of `/api/stripe/confirm-payment` failed. Now tracks confirmation status and shows a warning toast ("Payment was collected but failed to record") with a data refresh instead of falsely reporting success. The payment form is dismissed and the roster is refreshed so staff can see the actual state and retry if needed.
+
 ## [8.97.2] - 2026-03-22
 
 ### Bug Fixes: Stripe Product Startup, Error Diagnostics & Code Quality
